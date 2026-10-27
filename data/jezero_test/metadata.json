@@ -1,0 +1,49 @@
+{
+  "dataset_id": "jezero_test",
+  "label": "Jezero (dataset de prueba)",
+  "source": "CTX",
+  "crs": "IAU_2015:49900",
+  "size_m": [
+    31920.0,
+    30240.0
+  ],
+  "resolution_m": 20.0,
+  "shape": [
+    1512,
+    1596
+  ],
+  "elevation_range_m": [
+    -2710.7,
+    -1515.54
+  ],
+  "heightmap": {
+    "file": "heightmap.f32",
+    "format": "float32-le",
+    "units": "m"
+  },
+  "layers": [
+    {
+      "id": "base",
+      "file": "texture.png",
+      "type": "base"
+    },
+    {
+      "id": "slope",
+      "file": "slope.png",
+      "type": "overlay",
+      "unit": "deg",
+      "range": [
+        0,
+        45
+      ]
+    },
+    {
+      "id": "risk",
+      "file": "risk.png",
+      "type": "overlay",
+      "unit": "0-1"
+    }
+  ],
+  "acquisition_date": "2020-07-30",
+  "uncertainty_note": "DTM CTX B_soc_008 alineado a topografía MOLA (DeltaGeoid), resolución 20 m/píxel."
+}

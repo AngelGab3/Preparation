@@ -1,0 +1,42 @@
+{
+  "gravity_ms2": 3.71,
+  "eye_height_m": 1.6,
+  "walk_speed_ms": 1.2,
+  "run_speed_ms": 2.5,
+  "max_safe_slope_deg": 25,
+  "o2_reserve_l": 580.0,
+  "o2_base_consumption_l_per_h": 50.0,
+  "slope_cost_factors": [
+    {
+      "from_deg": 0,
+      "to_deg": 5,
+      "factor": 1.0
+    },
+    {
+      "from_deg": 5,
+      "to_deg": 10,
+      "factor": 1.35
+    },
+    {
+      "from_deg": 10,
+      "to_deg": 15,
+      "factor": 1.85
+    },
+    {
+      "from_deg": 15,
+      "to_deg": 20,
+      "factor": 2.6
+    },
+    {
+      "from_deg": 20,
+      "to_deg": 25,
+      "factor": 3.6
+    },
+    {
+      "from_deg": 25,
+      "to_deg": 90,
+      "factor": 5.0
+    }
+  ],
+  "notes": "Fuentes y supuestos: gravity_ms2=3.71 m/s² (NASA Mars Fact Sheet); eye_height_m=1.6 m (estatura ocular media con traje EVA); walk_speed_ms=1.2 m/s y run_speed_ms=2.5 m/s (locomoción EVA en 0.38 g, NASA STD-3001); max_safe_slope_deg=25° (umbral máximo operativo de estabilidad EVA/rover, Semana 1); o2_reserve_l=580 L (reserva útil de O2 gaseoso equivalente en PLSS xEMU para EVA de ~8 h); o2_base_consumption_l_per_h=50 L/h (~0.83 L/min VO2 a tasa metabólica base de ~250 W, NASA HIDH); slope_cost_factors: multiplicadores metabólicos en ascenso según pendiente (ecuación de Pandolf/Margaria adaptada a EVA)."
+}

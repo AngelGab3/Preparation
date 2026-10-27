@@ -1,0 +1,49 @@
+{
+  "dataset_id": "synth_crater",
+  "label": "Cráter Sintético (dataset de validación)",
+  "source": "synthetic",
+  "crs": "IAU_2015:49900",
+  "size_m": [
+    12850.0,
+    12850.0
+  ],
+  "resolution_m": 50.0,
+  "shape": [
+    257,
+    257
+  ],
+  "elevation_range_m": [
+    -1341.27,
+    -670.27
+  ],
+  "heightmap": {
+    "file": "heightmap.f32",
+    "format": "float32-le",
+    "units": "m"
+  },
+  "layers": [
+    {
+      "id": "base",
+      "file": "texture.png",
+      "type": "base"
+    },
+    {
+      "id": "slope",
+      "file": "slope.png",
+      "type": "overlay",
+      "unit": "deg",
+      "range": [
+        0,
+        45
+      ]
+    },
+    {
+      "id": "risk",
+      "file": "risk.png",
+      "type": "overlay",
+      "unit": "0-1"
+    }
+  ],
+  "acquisition_date": "2026-10-26",
+  "uncertainty_note": "DEM sintético analítico a 50 m/píxel para pruebas de cambio de dataset."
+}

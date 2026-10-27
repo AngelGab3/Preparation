@@ -1,0 +1,61 @@
+{
+  "dataset_id": "jezero_test",
+  "points": [
+    {
+      "id": "poi_01",
+      "name": "Sitio Octavia E. Butler (Base / Refugio)",
+      "position_m": [-2200.0, 1450.0],
+      "type": "shelter",
+      "description": "Zona llana de baja pendiente (< 4°) sobre el piso volcánico del cráter, óptima para módulo de aterrizaje, recarga de O₂ y refugio EVA.",
+      "source": "HiRISE / Mars 2020 Perseverance Landing Site"
+    },
+    {
+      "id": "poi_02",
+      "name": "Frente del Delta Occidental (Three Forks)",
+      "position_m": [-5400.0, -950.0],
+      "type": "sampling",
+      "description": "Escarpe frontal de antiguos depósitos fluvio-lacustres ricos en filosilicatos; alta prioridad astrobiológica para búsqueda de biosignaturas.",
+      "source": "CTX DTM + CRISM Mineralogy Map"
+    },
+    {
+      "id": "poi_03",
+      "name": "Unidad de Carbonatos Marginales",
+      "position_m": [-7200.0, -2800.0],
+      "type": "sampling",
+      "description": "Franja costera del paleolago con firmas intensas de carbonatos de Mg/Fe formados por precipitación en aguas alcalinas someras.",
+      "source": "CRISM / PIXL & SHERLOC M2020"
+    },
+    {
+      "id": "poi_04",
+      "name": "Campo de Megaripples de Séítah",
+      "position_m": [-3600.0, 2600.0],
+      "type": "hazard",
+      "description": "Terreno rugoso con dunas eólicas profundas y afloramientos empinados de olivino; alto costo metabólico y riesgo de deslizamiento.",
+      "source": "HiRISE Terrain Relative Navigation Hazard Map"
+    },
+    {
+      "id": "poi_05",
+      "name": "Canal de Entrada Neretva Vallis",
+      "position_m": [-10500.0, -3400.0],
+      "type": "sampling",
+      "description": "Garganta fluvial que alimentó el paleolago; expone estratos del basamento antiguo de Noachiano y cantos rodados transportados por inundación.",
+      "source": "MOLA / CTX Regional DTM"
+    },
+    {
+      "id": "poi_06",
+      "name": "Escarpe Interior del Anillo Norte",
+      "position_m": [-1200.0, -6800.0],
+      "type": "hazard",
+      "description": "Pared interna del cráter con pendientes superiores a 28° y bloques desprendidos; requiere rodeo en la planificación de ruta.",
+      "source": "CTX Slope Layer (> 25°)"
+    },
+    {
+      "id": "poi_07",
+      "name": "Estación de Contingencia Este (Planicie Lacustre)",
+      "position_m": [3800.0, -1800.0],
+      "type": "shelter",
+      "description": "Superficie consolidada y despejada en la cuenca oriental con visibilidad orbital directa para comunicaciones y abrigo de emergencia.",
+      "source": "CTX / MOLA Topographic Safety Assessment"
+    }
+  ]
+}

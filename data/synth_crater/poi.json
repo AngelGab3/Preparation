@@ -1,0 +1,37 @@
+{
+  "dataset_id": "synth_crater",
+  "points": [
+    {
+      "id": "poi_01",
+      "name": "Base de Operaciones Alfa",
+      "position_m": [-3200.0, 2100.0],
+      "type": "shelter",
+      "description": "Terraza exterior de baja pendiente apta para estacionamiento de hábitat y punto de partida de Marswalk.",
+      "source": "Synthetic Safety Layer"
+    },
+    {
+      "id": "poi_02",
+      "name": "Pico Central de Impacto",
+      "position_m": [150.0, -120.0],
+      "type": "sampling",
+      "description": "Levantamiento central del cráter que expone corteza profunda levantada durante el impacto.",
+      "source": "Synthetic Geologic Model"
+    },
+    {
+      "id": "poi_03",
+      "name": "Pared Escarpada del Anillo",
+      "position_m": [-1800.0, -1600.0],
+      "type": "hazard",
+      "description": "Talud interno de pendiente superior al umbral seguro de 25°.",
+      "source": "Synthetic Slope Analysis"
+    },
+    {
+      "id": "poi_04",
+      "name": "Depósito Estratificado Oriental",
+      "position_m": [2400.0, -1400.0],
+      "type": "sampling",
+      "description": "Sedimentos finos acumulados en el borde este de la cuenca.",
+      "source": "Synthetic Spectral Survey"
+    }
+  ]
+}

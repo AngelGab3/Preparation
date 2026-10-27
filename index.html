@@ -1,0 +1,460 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Marswalk · Explorador 3D</title>
+  <link rel="stylesheet" href="styles.css" />
+
+  <script type="importmap">
+  {
+    "imports": {
+      "three": "https://unpkg.com/three@0.169.0/build/three.module.js",
+      "three/addons/": "https://unpkg.com/three@0.169.0/examples/jsm/"
+    }
+  }
+  </script>
+</head>
+<body>
+
+  <div id="app"></div>
+
+  <div id="loading">
+    <div class="spinner"></div>
+    <p id="loading-msg">Cargando terreno…</p>
+    <small id="loading-sub">Leyendo metadata.json</small>
+  </div>
+
+  <!-- HUD compacto en vista orbital + Visor Sci-Fi completo en 1ª persona (estilo HUD_IDEA.jpeg) -->
+  <div id="eva-hud" class="eva-hud" aria-label="Telemetría EVA (HUD)">
+    <!-- Arriba izquierda: // MALFUNCTIONS y alertas de terreno -->
+    <div class="hud-top-left">
+      <div class="hud-tag">// EVA_STATUS · PLSS</div>
+      <div id="hud-slope-alert" class="hud-malfunction-box" role="alert" aria-live="polite" hidden>
+        <span class="malf-vert">ERR_01</span>
+        <span class="malf-icon">▲</span>
+        <span id="hud-alert-text" class="malf-text">Pendiente crítica (&gt; 25°) · Riesgo de caída</span>
+      </div>
+      <div class="hud-sub-status">
+        <span id="hud-status-line">Estabilidad nominal · Reserva O₂ activa</span>
+        <span id="hud-dataset-tag" class="hud-sub-code">EVA 1/1</span>
+      </div>
+      <div id="hud-env-line" class="hud-env-line">
+        MEDA // -63°C · 7.4 hPa · VIENTO 5.2 m/s · τ=0.45 [T = Tormenta]
+      </div>
+      <!-- Bitácora de objetivos científicos EVA (solo en 1ª persona, E3) -->
+      <div id="hud-science-log" class="hud-science-log">
+        <div class="hud-sci-header">
+          <span>// BITÁCORA CIENCIA EVA</span>
+          <span id="hud-sci-count" class="hud-sci-count">0 / 0</span>
+        </div>
+        <div id="hud-sci-list" class="hud-sci-list">Acércate a un Rover o POI y pulsa [E]</div>
+      </div>
+    </div>
+
+    <!-- Centro (solo 1ª persona): Retícula sci-fi + barra superior + segmentos inferiores -->
+    <div class="hud-center-reticle" aria-hidden="true">
+      <div class="reticle-top-bar">
+        <span class="reticle-label">// PENDIENTE LOCAL</span>
+        <div class="reticle-bar-track">
+          <div id="reticle-slope-fill" class="reticle-bar-fill"></div>
+        </div>
+      </div>
+
+      <div class="reticle-brackets">
+        <svg viewBox="0 0 220 140" class="reticle-svg">
+          <!-- Arcos exteriores tenues -->
+          <path d="M 38 25 A 75 75 0 0 0 38 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <path d="M 182 25 A 75 75 0 0 1 182 115" fill="none" stroke="rgba(102, 252, 241, 0.28)" stroke-width="1.5" stroke-dasharray="5 4"/>
+          <!-- Brackets internos -->
+          <path d="M 78 36 L 64 36 L 64 104 L 78 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
+          <path d="M 142 36 L 156 36 L 156 104 L 142 104" fill="none" stroke="rgba(102, 252, 241, 0.65)" stroke-width="1.6"/>
+          <!-- Mirilla central cuadrada -->
+          <path d="M 105 64 L 102 64 L 102 67 M 115 64 L 118 64 L 118 67 M 105 76 L 102 76 L 102 73 M 115 76 L 118 76 L 118 73" fill="none" stroke="#66fcf1" stroke-width="1.6"/>
+          <circle cx="110" cy="70" r="1.5" fill="#66fcf1"/>
+        </svg>
+      </div>
+
+      <div id="reticle-segments" class="reticle-segments">
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+        <span></span><span></span><span></span><span></span><span></span><span></span>
+      </div>
+
+      <!-- Prompt interactivo por proximidad a Rover / Hábitat / POI en 1ª persona (E3) -->
+      <div id="hud-interact-prompt" class="hud-interact-prompt" hidden>
+        <span class="key-badge">E</span>
+        <span id="hud-interact-text">ANALIZAR MUESTRA / CONECTAR CON ROVER</span>
+      </div>
+
+      <!-- Tarjeta de resultado espectrométrico / telemetría de misión al pulsar [E] (E3) -->
+      <div id="hud-science-toast" class="hud-science-toast" hidden>
+        <div id="hud-toast-title" class="hud-toast-title">ANÁLISIS COMPLETADO</div>
+        <div id="hud-toast-spectrum" class="hud-toast-spectrum"></div>
+        <div id="hud-toast-desc" class="hud-toast-desc"></div>
+        <div id="hud-toast-source" class="hud-toast-source"></div>
+      </div>
+
+      <!-- Transmisión de radio del Copiloto ARES-AI (E6 - Tecla C) -->
+      <div id="hud-radio-toast" class="hud-radio-toast hidden">
+        <div class="hud-radio-header">
+          <span class="hud-radio-dot">●</span>
+          <span>🎙️ COMMS // ARES-AI [LLAMA 3]</span>
+          <span class="hud-radio-freq">CH-1 · CAPCOM [C]</span>
+        </div>
+        <div id="hud-radio-text" class="hud-radio-text"></div>
+      </div>
+    </div>
+
+    <!-- Abajo izquierda: Barras de Oxígeno (O₂) y flujo metabólico -->
+    <div class="hud-bottom-left">
+      <div class="hud-o2-wrap">
+        <span class="hud-vert-label">O2_RES</span>
+        <div class="hud-bars-stack">
+          <div class="hud-bar-row main">
+            <span class="hud-bar-icon">+</span>
+            <div class="hud-o2-bar-bg">
+              <div id="hud-o2-bar" class="hud-o2-bar-fill"></div>
+            </div>
+            <span id="hud-o2" class="hud-bar-num">580.0 L</span>
+          </div>
+          <div class="hud-bar-row sub">
+            <span class="hud-bar-icon">★</span>
+            <span class="hud-sub-lvl">FLX</span>
+            <div class="hud-flux-bar-bg">
+              <div id="hud-flux-bar" class="hud-flux-bar-fill"></div>
+            </div>
+            <span id="hud-o2-rate" class="hud-bar-num">50.0 L/h</span>
+          </div>
+        </div>
+        <button id="hud-reset-o2" class="hud-recharge-tile" type="button" title="Recargar reserva de O₂">
+          <span>⚡</span>
+          <small>O₂</small>
+        </button>
+      </div>
+    </div>
+
+    <!-- Abajo centro (solo 1ª persona): Pulso metabólico + Velocidad + Iconos de estado -->
+    <div class="hud-bottom-center" aria-hidden="true">
+      <div class="hud-ecg-row">
+        <span class="hud-vert-tiny">MET</span>
+        <svg viewBox="0 0 180 28" class="hud-ecg-svg">
+          <path d="M 0 16 L 68 16 L 76 16 L 81 6 L 87 25 L 93 2 L 99 22 L 104 12 L 109 16 L 180 16" fill="none" stroke="#f6c945" stroke-width="1.8"/>
+        </svg>
+      </div>
+      <div class="hud-speed-readout">
+        <span class="bolt">⚡</span>
+        <span id="hud-speed">0.0 m/s</span>
+      </div>
+      <div class="hud-status-Hex-row">
+        <div id="badge-walk" class="hud-badge active" title="Locomoción">🥾</div>
+        <div id="badge-run" class="hud-badge" title="Sprint activo">⏩</div>
+        <div id="badge-slope" class="hud-badge" title="Estado de pendiente">⛰</div>
+        <div id="badge-o2" class="hud-badge active" title="Soporte vital PLSS">🛡</div>
+      </div>
+    </div>
+
+    <!-- Abajo derecha: Cronómetro EVA + Cajas de telemetría + Mini-radar con brújula -->
+    <div class="hud-bottom-right">
+      <div class="hud-timer-box">
+        <span id="hud-timer">00:00:00.0</span>
+        <small class="hud-vert-tiny">TIME</small>
+      </div>
+      <div class="hud-map-row">
+        <div class="hud-telemetry-boxes">
+          <div class="hud-stat-box">
+            <span class="stat-vert">ELEV</span>
+            <span id="hud-elev" class="stat-val">—</span>
+            <span class="stat-icon">◈</span>
+          </div>
+          <div class="hud-stat-box">
+            <span class="stat-vert">SLPE</span>
+            <span id="hud-slope" class="stat-val">—</span>
+            <span class="stat-icon">◬</span>
+          </div>
+          <div class="hud-stat-box">
+            <span class="stat-vert">O2_%</span>
+            <span id="hud-o2-pct" class="stat-val">100%</span>
+            <span class="stat-icon">●</span>
+          </div>
+        </div>
+
+        <div class="hud-minimap-card">
+          <div class="hud-compass-strip">
+            <div id="hud-compass-track" class="hud-compass-track">
+              N · · · NE · · · E · · · SE · · · S · · · SW · · · W · · · NW · · · N · · · NE · · · E
+            </div>
+            <span class="compass-Pip">▼</span>
+          </div>
+          <canvas id="hud-minimap" width="180" height="104"></canvas>
+          <div class="minimap-footer">LOCAL_SCAN · 2×2 KM</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="controls">
+    <div class="row">
+      <label for="h-slider">Exageración</label>
+      <input id="h-slider" type="range" min="0.25" max="4" step="0.05" value="2" />
+      <span id="h-value">2.00×</span>
+    </div>
+    <button id="mode-btn" type="button">Explorar (1ª Persona)</button>
+  </div>
+
+  <!-- Panel Orbital Derecho: Dataset, Capas Multi-Misión y Condiciones MEDA -->
+  <aside id="layers-panel" class="layers-panel right-panel" aria-label="Dataset, Capas y Condiciones Ambientales">
+    <div class="layers-header">Dataset &amp; Incertidumbre</div>
+    <div class="dataset-bar">
+      <label for="dataset-select" class="sr-only">Zona de estudio</label>
+      <select id="dataset-select" class="dataset-select" title="Cambiar zona de estudio (dataset)">
+        <option value="jezero_test">Jezero (dataset de prueba)</option>
+        <option value="synth_crater">Cráter Sintético (validación)</option>
+      </select>
+    </div>
+    <div class="realtime-dem-row">
+      <button id="upload-dem-btn" class="route-btn secondary" type="button" title="Cargar archivo GeoTIFF (.tif) o binario (.f32) en tiempo real">
+        📂 Cargar DEM (.tif/.f32)
+      </button>
+      <button id="replay-cinematic-btn" class="route-btn secondary" type="button" title="Reproducir cinemática narrativa Tierra -> Marte">
+        🎬 Intro
+      </button>
+      <input id="upload-dem-input" type="file" accept=".tif,.tiff,.f32" hidden />
+    </div>
+    <div id="upload-dem-status" class="upload-dem-status" hidden></div>
+    <div id="uncertainty-box" class="uncertainty-box">
+      <div id="meta-source-line" class="meta-source-line">Fuente: —</div>
+      <div id="meta-uncertainty-note" class="meta-uncertainty-note">Cargando metadatos…</div>
+    </div>
+
+    <div class="layers-header">Capas Multi-Misión (Layered View)</div>
+    <div id="layers-list" class="layers-list"></div>
+
+    <div class="layers-header route-header">Física Solar &amp; Clima (MEDA)</div>
+    <div class="solar-control-box">
+      <div class="solar-coords-row">
+        <span id="solar-coords-label">📍 18.38° N, 77.58° E</span>
+        <span id="solar-phase-badge" class="solar-phase-badge">DÍA</span>
+      </div>
+      <div class="solar-slider-group">
+        <div class="solar-slider-top">
+          <label for="solar-ltst-slider">Hora Solar (LTST)</label>
+          <div class="solar-ltst-right">
+            <span id="solar-ltst-val" class="solar-val-mono">10:30</span>
+            <button id="solar-cycle-btn" class="solar-mini-btn" type="button" title="Animar ciclo diurno marciano en tiempo real">▶</button>
+          </div>
+        </div>
+        <input id="solar-ltst-slider" type="range" min="0" max="24" step="0.1" value="10.5" />
+      </div>
+      <div class="solar-slider-group">
+        <div class="solar-slider-top">
+          <label for="solar-ls-select">Órbita (Ls / Dist. Sol)</label>
+        </div>
+        <select id="solar-ls-select" class="dataset-select solar-select" title="Longitud solar areocéntrica Ls (determina distancia Marte-Sol r en AU y declinación δ)">
+          <option value="142">Ls 142° · Nominal Jezero (1.56 AU)</option>
+          <option value="251">Ls 251° · Perihelio Máx. Sol (1.38 AU)</option>
+          <option value="71">Ls 71° · Afelio Mín. Sol (1.67 AU)</option>
+          <option value="0">Ls 0° · Equinoccio Primavera (1.45 AU)</option>
+        </select>
+      </div>
+    </div>
+    <dl class="weather-metrics">
+      <dt>Dist. Sol (r)</dt>  <dd id="wm-dist-au">1.564 AU</dd>
+      <dt>Irrad. Sup.</dt>    <dd id="wm-irrad">412 W/m²</dd>
+      <dt>Sol (El/Az)</dt>    <dd id="wm-sun-ang">66° / 112°</dd>
+      <dt>Temp. Sup.</dt>     <dd id="wm-temp">-63 °C</dd>
+      <dt>Viento</dt>         <dd id="wm-wind">5.2 m/s</dd>
+      <dt>Polvo (τ)</dt>      <dd id="wm-tau">τ = 0.45</dd>
+    </dl>
+    <div class="weather-actions">
+      <button id="weather-storm-btn" class="route-btn storm" type="button">
+        🌪️ Simular Tormenta de Polvo (MEDA)
+      </button>
+      <button id="weather-evac-btn" class="route-btn secondary evac" type="button" title="Trazar ruta de evacuación desde el astronauta al Refugio más cercano">
+        🚨 Evacuar a Refugio
+      </button>
+    </div>
+
+    <!-- Copiloto de Misión EVA ARES-AI (E6 - Meta Llama 3) -->
+    <div class="layers-header route-header copilot-title-row">
+      <span>🎙️ Copiloto ARES-AI (Llama 3)</span>
+      <div class="copilot-hdr-btns">
+        <button id="copilot-voice-btn" class="copilot-mini-btn" type="button" title="Activar/desactivar audio de radio">🔇 Voz</button>
+        <button id="copilot-settings-btn" class="copilot-mini-btn" type="button" title="Configurar API Key de Groq/Llama">⚙️ API</button>
+      </div>
+    </div>
+    <div class="copilot-chat-wrap">
+      <div id="copilot-messages" class="copilot-messages"></div>
+      <div class="copilot-quick-pills">
+        <button class="copilot-quick-btn" type="button" data-prompt="¿Es seguro continuar la caminata en este momento?">🚨 ¿Seguro?</button>
+        <button class="copilot-quick-btn" type="button" data-prompt="¿Cuál es el siguiente objetivo científico prioritario?">🔬 Siguiente POI</button>
+        <button class="copilot-quick-btn" type="button" data-prompt="Evalúa la viabilidad de la ruta activa A* / QAOA">🗺️ Ruta</button>
+        <button class="copilot-quick-btn" type="button" data-prompt="Dame un reporte meteorológico y de polvo MEDA">📡 Clima</button>
+      </div>
+      <div class="copilot-input-row">
+        <input id="copilot-input" class="copilot-input" type="text" placeholder="Pregunta a CAPCOM ARES-AI (Llama 3)..." />
+        <button id="copilot-send-btn" class="route-btn copilot-send" type="button" title="Transmitir por radio">➤</button>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Columna Orbital Izquierda: Planificador de Ruta + Astronauta justo debajo -->
+  <div class="left-orbital-stack">
+    <aside id="route-panel" class="layers-panel left-panel" aria-label="Planificador de Ruta y Perfil de Elevación">
+      <div class="layers-header">Planificador de Ruta</div>
+      <div class="algo-switch-row" role="group" aria-label="Algoritmo de ruta">
+        <button id="algo-astar" class="algo-pill active" type="button" data-algo="astar">A* Clásico</button>
+        <button id="algo-qaoa" class="algo-pill" type="button" data-algo="qaoa">QAOA Cuántico</button>
+        <button id="algo-compare" class="algo-pill" type="button" data-algo="compare">A* vs QAOA</button>
+      </div>
+      <div class="route-actions">
+        <button id="route-pick-btn" class="route-btn" type="button">📍 Elegir Inicio / Destino</button>
+        <button id="route-clear-btn" class="route-btn secondary" type="button" title="Limpiar ruta">✕</button>
+      </div>
+      <button id="route-science-tour-btn" class="route-btn science-tour" type="button" title="Trazar travesía que parte del Refugio y visita múltiples POIs científicos">
+        🔬 Travesía Científica (Multi-POI)
+      </button>
+      <div id="route-status" class="route-status">Haz clic en el botón o desde el popup del mapa.</div>
+      <dl id="route-metrics" class="route-metrics">
+        <dt>Algoritmo</dt>    <dd id="rm-algo">A*</dd>
+        <dt>Distancia</dt>    <dd id="rm-dist">—</dd>
+        <dt>Oxígeno est.</dt> <dd id="rm-o2">—</dd>
+        <dt>Pend. máx.</dt>   <dd id="rm-slope">—</dd>
+        <dt>Riesgo (0-1)</dt> <dd id="rm-risk">—</dd>
+      </dl>
+      <div id="route-compare-box" class="route-compare-box" hidden></div>
+      <div class="route-profile-wrap">
+        <div class="route-profile-label">Perfil de Elevación y Pendiente (2D)</div>
+        <canvas id="route-profile-canvas" width="246" height="86"></canvas>
+      </div>
+      <button id="route-export-btn" class="route-btn export" type="button">⬇ Exportar route.json</button>
+    </aside>
+
+    <div id="astronaut-dock" class="astronaut-dock" title="Arrastra el astronauta al mapa">
+      <div class="dock-icon">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <g transform="translate(50 52)">
+            <ellipse cx="0" cy="18" rx="20" ry="24" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
+            <rect x="-30" y="6" width="11" height="24" rx="3" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
+            <circle cx="0" cy="-14" r="19" fill="#f2f2f2" stroke="#2a3542" stroke-width="2"/>
+            <path d="M -15 -15 Q 0 -32 15 -15 Q 15 -1 0 -1 Q -15 -1 -15 -15 Z" fill="#ff6a3d"/>
+            <rect x="-7" y="12" width="14" height="3" rx="1" fill="#ff6a3d"/>
+          </g>
+        </svg>
+        <div class="dock-badge">✓</div>
+      </div>
+      <div class="dock-label">Arrastra al mapa</div>
+    </div>
+  </div>
+
+  <div class="hint">
+    Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa
+  </div>
+
+  <div id="crosshair" aria-hidden="true"></div>
+
+  <div id="info-popup" class="info-popup" role="dialog" aria-hidden="true">
+    <button class="info-close" aria-label="Cerrar">×</button>
+    <div class="info-header-row">
+      <div id="info-title" class="info-title">Sitio seleccionado</div>
+      <span id="info-poi-badge" class="info-poi-badge" hidden>POI</span>
+    </div>
+    <div id="info-poi-meta" class="info-poi-meta" hidden>
+      <p id="info-poi-desc" class="info-poi-desc"></p>
+      <div id="info-poi-source" class="info-poi-source"></div>
+    </div>
+    <dl class="info-grid">
+      <dt>Elevación</dt>  <dd id="info-elev">—</dd>
+      <dt>Pendiente</dt>  <dd id="info-slope">—</dd>
+      <dt>Distancia</dt>  <dd id="info-dist">—</dd>
+    </dl>
+    <div class="info-route-btns">
+      <button id="popup-set-start" type="button">Fijar Inicio (A)</button>
+      <button id="popup-set-goal" type="button">Fijar Destino (B)</button>
+    </div>
+    <button id="popup-visit-fp" class="info-visit-fp-btn" type="button">
+      🚀 Visitar en 1ª Persona (Ver Rover / Sitio)
+    </button>
+  </div>
+
+  <!-- Cinemática Inicial Narrativa: De la Tierra a Marte (E1) -->
+  <div id="intro-cinematic" class="intro-cinematic hidden" role="dialog" aria-label="Cinemática de misión Tierra a Marte">
+    <canvas id="cinematic-canvas"></canvas>
+    <div class="cinematic-hud">
+      <div class="cinematic-top-bar">
+        <span id="cinematic-phase" class="cinematic-phase">// ACTO I · TRANSFERENCIA INTERPLANETARIA HOHMANN</span>
+        <span class="cinematic-badge">NASA SPACE APPS · MARSWALK EVA</span>
+      </div>
+
+      <div class="cinematic-bottom-card">
+        <h2 id="cinematic-title" class="cinematic-title">DE LA TIERRA A MARTE · MISIÓN ARES EVA-01</h2>
+        <p id="cinematic-subtitle" class="cinematic-subtitle">
+          Durante décadas, los exploradores robóticos de la NASA cartografiaron un mundo extremo…
+        </p>
+        <div id="cinematic-missions" class="cinematic-missions" data-stage="1">
+          <span class="msn-pill">MGS · MOLA Altimetry</span>
+          <span class="msn-pill">Mars Odyssey · THEMIS</span>
+          <span class="msn-pill">MRO · CTX &amp; CRISM</span>
+          <span class="msn-pill">Mars 2020 · Perseverance &amp; MEDA</span>
+        </div>
+        <div class="cinematic-footer-row">
+          <div class="cinematic-progress-track">
+            <div id="cinematic-progress-fill" class="cinematic-progress-fill"></div>
+          </div>
+          <button id="cinematic-skip-btn" class="cinematic-skip-btn" type="button">
+            Saltar Cinemática ⏭ (Espacio)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal de Configuración de API Key para Llama / Groq -->
+  <div id="copilot-modal" class="copilot-modal hidden" role="dialog" aria-label="Configuración de ARES-AI">
+    <div class="copilot-modal-card">
+      <div class="copilot-modal-header">
+        <h3>⚙️ Copiloto ARES-AI · Configuración Llama 3</h3>
+        <button id="copilot-close-modal-btn" class="info-close" type="button" aria-label="Cerrar">×</button>
+      </div>
+      <p class="copilot-modal-desc">
+        ARES-AI se comunica con <strong>Meta Llama 3</strong> vía <strong>Groq Cloud</strong> (ultrarrápido y gratuito).
+        Si no ingresas clave, opera con el <strong>Motor Aeroespacial Heurístico Offline</strong> de respaldo con datos en vivo.
+      </p>
+      <div class="copilot-field">
+        <label for="copilot-api-key-input">Groq API Key (gsk_...)</label>
+        <input id="copilot-api-key-input" type="password" placeholder="Pega tu clave gsk_... (opcional)" autocomplete="off" />
+        <small>Consigue tu clave gratis en <a href="https://console.groq.com/keys" target="_blank" rel="noopener">console.groq.com</a> (se guarda solo en tu navegador).</small>
+      </div>
+      <div class="copilot-field">
+        <label for="copilot-model-select">Modelo Llama 3</label>
+        <select id="copilot-model-select" class="dataset-select">
+          <option value="llama-3.3-70b-versatile">Meta Llama 3.3 70B Versatile (Recomendado)</option>
+          <option value="llama-3.1-8b-instant">Meta Llama 3.1 8B Instant (Ultrarrápido)</option>
+        </select>
+      </div>
+      <div class="copilot-modal-actions">
+        <button id="copilot-save-key-btn" class="route-btn" type="button">Guardar y Activar</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('error', (e) => {
+      const el = document.getElementById('loading');
+      if (el && !el.classList.contains('hidden')) {
+        document.getElementById('loading-msg').textContent = '⚠ Error JS: ' + e.message;
+        document.getElementById('loading-msg').style.color = '#ff6a3d';
+        document.getElementById('loading-sub').textContent = (e.filename || '') + (e.lineno ? ':' + e.lineno : '');
+      }
+    });
+    window.addEventListener('unhandledrejection', (e) => {
+      const el = document.getElementById('loading');
+      if (el && !el.classList.contains('hidden')) {
+        document.getElementById('loading-msg').textContent = '⚠ Promise error: ' + (e.reason?.message || e.reason);
+        document.getElementById('loading-msg').style.color = '#ff6a3d';
+        document.getElementById('loading-sub').textContent = 'Revisa la consola del navegador (F12)';
+      }
+    });
+  </script>
+  <script type="module" src="main.js"></script>
+</body>
+</html>
