@@ -1,0 +1,36 @@
+body.intro-playing > :not(#intro-cinematic):not(script):not(style){visibility:hidden}
+.signal-intro{position:fixed;inset:0;z-index:100;overflow:hidden;background:#201824;color:#f9e8d4;font-family:Arial,Helvetica,sans-serif}
+.signal-intro.hidden,.signal-intro [hidden]{display:none!important}
+.signal-3d-stage{position:absolute;inset:0}.signal-3d-stage canvas{display:block;width:100%;height:100%}
+.signal-vignette{position:absolute;inset:0;pointer-events:none;background:radial-gradient(circle at 51% 55%,transparent 25%,#1c1420aa 90%),linear-gradient(90deg,#1c1420ee,transparent 39%,transparent 68%,#1c142099)}
+.signal-top{position:absolute;z-index:2;top:36px;left:48px;right:48px;display:flex;justify-content:space-between;align-items:start;gap:24px}
+.signal-brand{font-weight:800;font-size:19px;letter-spacing:.25em}.signal-brand span{display:block;font:10px/2 Consolas,monospace;letter-spacing:.25em;color:#eaa47f}
+.signal-intro button{font:11px Consolas,monospace;letter-spacing:.13em;cursor:pointer;border:0;color:inherit}
+.signal-intro button:focus-visible{outline:2px solid #ffd8a4;outline-offset:5px}
+#signal-sound{padding:10px 0;background:none;border-bottom:1px solid #ca9e82}
+.signal-heading{position:absolute;left:5%;top:32%;z-index:2;pointer-events:none;max-width:400px}
+.signal-eyebrow{font:11px Consolas,monospace;letter-spacing:.23em;color:#f5aa79}
+.signal-heading h1{font-size:clamp(46px,6vw,108px);line-height:.89;letter-spacing:-.055em;margin:22px 0 20px;font-weight:900;color:#ffe5c7;text-shadow:0 3px 24px #1c1420}
+.signal-heading h1 em{font-style:normal;color:#ff986b}.signal-heading p{font-size:15px;line-height:1.6;color:#f6d5c1}
+.signal-actions{position:absolute;z-index:2;bottom:45px;left:48px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.signal-actions p{width:100%;font:11px Consolas,monospace;letter-spacing:.16em;color:#ffc799;margin:0 0 8px}
+#signal-start,#signal-continue{background:#ffad77;color:#261b25;padding:19px 24px;font-weight:bold;box-shadow:0 8px 32px #1b121c88}
+#signal-start:hover,#signal-continue:hover{background:#ffe0b5}
+#signal-start span,#signal-continue span{font-size:18px;margin-left:30px}
+#signal-replay{background:#2d212d99;border:1px solid #ac796d;padding:19px 21px}
+.signal-side{position:absolute;right:48px;bottom:60px;z-index:2;font:10px Consolas,monospace;letter-spacing:.2em;color:#ffc799}.signal-side span{margin:0 12px}
+@media(max-width:760px){.signal-top{top:22px;left:20px;right:20px}.signal-brand{font-size:14px}.signal-brand span{font-size:8px}.signal-heading{top:19%;left:20px;max-width:260px}.signal-heading h1{font-size:clamp(32px,7vw,42px);line-height:.94}.signal-heading p{font-size:12px;max-width:225px}.signal-actions{left:20px;right:20px;bottom:22px}.signal-actions p{line-height:1.6}.signal-side{display:none}#signal-start,#signal-continue{padding:16px}#signal-replay{padding:16px}}
+
+.signal-heading{max-width:min(420px,40vw)}
+.signal-heading h1{font-size:clamp(42px,5vw,78px);line-height:.94;max-width:520px}
+.signal-intro[data-phase="solar"]{background:#100f20}
+.signal-intro[data-phase="solar"] .signal-vignette{background:radial-gradient(circle,transparent 25%,#100f20b0 95%)}
+.signal-intro[data-phase="solar"] .signal-heading,.signal-intro[data-phase="mars"] .signal-heading{top:21%}
+.signal-intro[data-phase="visor"] .signal-heading{opacity:0;transition:opacity 1.1s ease}
+.signal-intro.is-ready .signal-heading{opacity:1;top:16%;max-width:530px}
+.signal-intro.is-ready .signal-heading h1{font-size:clamp(36px,4vw,64px)}
+.signal-visor{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;transition:opacity 1.3s ease;border:clamp(18px,4vw,60px) solid #171d218f;border-radius:38% / 28%;box-shadow:inset 0 0 90px 25px #15191da8,0 0 0 80px #15191d7a}
+.signal-intro.is-visor .signal-visor{opacity:1}
+.signal-visor-cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:28px Consolas,monospace;color:#fff0d284}
+.signal-visor span{position:absolute;right:4%;bottom:4%;font:10px Consolas,monospace;letter-spacing:.2em;color:#ffe0b4}
+@media(max-width:760px){.signal-heading{top:18%;max-width:255px}.signal-heading h1{font-size:clamp(32px,7vw,43px)}.signal-intro[data-phase="solar"] .signal-heading,.signal-intro[data-phase="mars"] .signal-heading{top:17%}.signal-intro.is-ready .signal-heading{top:16%;max-width:255px}.signal-intro.is-ready .signal-heading h1{font-size:32px}.signal-side{display:none}}

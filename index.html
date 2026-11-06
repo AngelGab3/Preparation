@@ -206,7 +206,7 @@
         📂 Cargar DEM (.tif/.f32)
       </button>
       <button id="replay-cinematic-btn" class="route-btn secondary" type="button"
-        title="Reproducir cinemática narrativa Tierra -> Marte">
+        title="Reproducir viaje Tierra a Marte">
         🎬 Intro
       </button>
       <input id="upload-dem-input" type="file" accept=".tif,.tiff,.f32" hidden />
@@ -459,37 +459,25 @@
     </button>
   </div>
 
-  <div id="intro-cinematic" class="intro-cinematic hidden" role="dialog"
-    aria-label="Cinemática de misión Tierra a Marte">
-    <canvas id="cinematic-canvas"></canvas>
-    <div class="cinematic-hud">
-      <div class="cinematic-top-bar">
-        <span id="cinematic-phase" class="cinematic-phase">// ACTO I · TRANSFERENCIA INTERPLANETARIA HOHMANN</span>
-        <span class="cinematic-badge">NASA SPACE APPS · MARSWALK EVA</span>
-      </div>
-
-      <div class="cinematic-bottom-card">
-        <h2 id="cinematic-title" class="cinematic-title">DE LA TIERRA A MARTE · MISIÓN ARES EVA-01</h2>
-        <p id="cinematic-subtitle" class="cinematic-subtitle">
-          Durante décadas, los exploradores robóticos de la NASA cartografiaron un mundo extremo…
-        </p>
-        <div id="cinematic-missions" class="cinematic-missions" data-stage="1">
-          <span class="msn-pill">MGS · MOLA Altimetry</span>
-          <span class="msn-pill">Mars Odyssey · THEMIS</span>
-          <span class="msn-pill">MRO · CTX &amp; CRISM</span>
-          <span class="msn-pill">Mars 2020 · Perseverance &amp; MEDA</span>
-        </div>
-        <div class="cinematic-footer-row">
-          <div class="cinematic-progress-track">
-            <div id="cinematic-progress-fill" class="cinematic-progress-fill"></div>
-          </div>
-          <button id="cinematic-skip-btn" class="cinematic-skip-btn" type="button">
-            Saltar Cinemática ⏭ (Espacio)
-          </button>
-        </div>
-      </div>
+  <section id="intro-cinematic" class="signal-intro hidden" role="dialog" aria-modal="true" aria-label="Inicio de Marswalk">
+    <div id="signal-3d-stage" class="signal-3d-stage" aria-hidden="true"></div>
+    <div class="signal-vignette" aria-hidden="true"></div>
+    <header class="signal-top"><div class="signal-brand">MARSWALK <span>EXPLORACIÓN MARCIANA</span></div><button id="signal-sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button></header>
+    <div class="signal-heading">
+      <span id="signal-kicker" class="signal-eyebrow">01 / TIERRA</span>
+      <h1 id="signal-title">LA MISIÓN COMIENZA</h1>
+      <p id="signal-subtitle">Haz clic en el astronauta o en el cohete para comenzar.</p>
     </div>
-  </div>
+    <div class="signal-actions">
+      <p id="signal-hint" role="status">PULSA UNA FIGURA PARA INICIAR</p>
+      <button id="signal-start" type="button">COMENZAR VIAJE <span>↗</span></button>
+      <button id="signal-continue" type="button" hidden>IR AL MAPA PRINCIPAL <span>↗</span></button>
+      <button id="signal-replay" type="button">↺ REPETIR VIAJE</button>
+    </div>
+    <div class="signal-visor" aria-hidden="true"><div class="signal-visor-cross">+</div><span>EVA // SUPERFICIE MARCIANA</span></div>
+    <div class="signal-side" aria-hidden="true">01 / TIERRA <span>···</span> 02 / TRAYECTO <span>···</span> 03 / MARTE</div>
+  </section>
+  <p id="intro-feedback" class="intro-feedback" role="alert" hidden></p>
 
   <div id="copilot-modal" class="copilot-modal hidden" role="dialog" aria-label="Configuración de ARES-AI">
     <div class="copilot-modal-card">
