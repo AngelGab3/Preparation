@@ -81,6 +81,44 @@ export function getCopilotMissionSnapshot() {
   };
 }
 
+/* ------------------------------------------- Banco de Datos Curiosos de Robert (Rover Perseverance) */
+let factIndex = Math.floor(Math.random() * 18);
+let autoFactTimer_s = 0;
+let welcomedInFP = false;
+let audioCtx = null;
+
+function getNextRoverFunFact(snap) {
+  const elev = snap.traje_plss.elevacion_actual_m;
+  const temp = snap.clima_meda.temp_c;
+  const o2 = snap.traje_plss.o2_pct;
+  const ltst = snap.astronomia_solar.ltst;
+
+  const facts = [
+    `🤖 DATO CURIOSO (Jezero Paleo-Lago): Hace unos 3,700 millones de años, el suelo donde estamos parados (${elev} m) estaba bajo decenas de metros de agua líquida. El cráter Jezero tenía un río de entrada y otro de salida.`,
+    `🤖 DATO CURIOSO (Batería Nuclear MMRTG): No uso paneles solares como los rovers antiguos; mi generador trasero lleva 4.8 kg de dióxido de plutonio-238 que me da 110 W de electricidad y mantiene mi electrónica caliente a ${temp} °C.`,
+    `🤖 DATO CURIOSO (Experimento MOXIE): En mi interior llevo el instrumento MOXIE, que ya demostró fabricar oxígeno respirable directamente del CO₂ marciano (95% de la atmósfera) a 800 °C. ¡El futuro de tu reserva PLSS (${o2}%)!`,
+    `🤖 DATO CURIOSO (Atardeceres Azules): En Marte el cielo diurno es color caramelo por el polvo rico en óxidos de hierro, pero al atardecer el cono alrededor del Sol se vuelve azul brillante por la dispersión Mie del polvo fino.`,
+    `🤖 DATO CURIOSO (Láser SuperCam): El ojo grande en mi cabeza puede disparar pulsos láser infrarrojos a rocas hasta a 7 metros de distancia, calentándolas a 10,000 °C para leer su composición química por el destello de plasma.`,
+    `🤖 DATO CURIOSO (Helicóptero Ingenuity): Mi compañero Ingenuity viajó plegado bajo mi panza. Logró 72 vuelos en una atmósfera con apenas el 1% de la densidad de la Tierra haciendo girar sus rotores a 2,537 rpm.`,
+    `🤖 DATO CURIOSO (Gravedad Marciana): Aquí la gravedad es de 3.71 m/s² (un 38% de la terrestre). Aunque tu traje EVA completo pesa unos 130 kg en la Tierra, aquí en Marte lo sientes como de solo 49 kg.`,
+    `🤖 DATO CURIOSO (Ruedas Todo Terreno): Mis 6 ruedas de aluminio de 52.5 cm tienen listones curvos de titanio y motores individuales. Si miras mis huellas, dejan un patrón que sirve para medir con precisión cuánto patino en las dunas.`,
+    `🤖 DATO CURIOSO (Sonidos en Marte): Llevo dos micrófonos reales. En Marte el sonido viaja más lento (~240 m/s frente a 343 m/s en la Tierra) y el CO₂ absorbe los sonidos agudos mucho antes que los graves.`,
+    `🤖 DATO CURIOSO (Radar Subterráneo RIMFAX): Mientras camino a tu lado, mi radar RIMFAX penetra hasta 10 metros bajo nuestros pies revelando capas de sedimentos lacustres e ígneos invisibles desde la superficie.`,
+    `🤖 DATO CURIOSO (Carbonatos Marginales): El borde interno del cráter Jezero conserva una franja de carbonatos precipitados en la antigua orilla del lago; en la Tierra, estos minerales son excelentes para atrapar microfósiles.`,
+    `🤖 DATO CURIOSO (SHERLOC & WATSON): En la punta de mi brazo robótico llevo un espectrómetro UV llamado SHERLOC que busca compuestos orgánicos y aminoácidos sin siquiera tocar la roca.`,
+    `🤖 DATO CURIOSO (Día Marciano - Sol): Ahora son las ${ltst} LTST. Un día solar en Marte (llamado "Sol") dura 24 horas, 39 minutos y 35 segundos: ¡casi idéntico al ritmo circadiano humano!`,
+    `🤖 DATO CURIOSO (Tubos de Titanio): Llevo 43 tubos ultra-limpios recubiertos de nitruro de titanio dorado para reflejar el calor solar y conservar muestras intactas hasta que una misión humana como la tuya las recoja.`,
+    `🤖 DATO CURIOSO (Remolinos Dust Devils): Aunque el viento marciano a 60 km/h apenas empuja como una brisa suave por la baja presión (${snap.clima_meda.presion_hpa} hPa), levanta remolinos de polvo de hasta 2 km de altura.`,
+    `🤖 DATO CURIOSO (Fisiología en Pendientes): Subir una ladera de más de 15° con traje presurizado duplica tu gasto metabólico y tu temperatura corporal central; por eso nuestro algoritmo busca rutas suaves.`,
+    `🤖 DATO CURIOSO (Cerebro Resistente a Radiación): Mi computadora de vuelo usa un procesador RAD750 blindado contra rayos cósmicos, capaz de operar sin fallos en medio de tormentas solares.`,
+    `🤖 DATO CURIOSO (HiRISE 1 m/px): La cámara orbital HiRISE a bordo del MRO fotografía Marte desde 300 km de altura con tal nitidez que puede distinguirme a mí y a tus huellas sobre el regolito.`,
+  ];
+
+  const fact = facts[factIndex % facts.length];
+  factIndex = (factIndex + 1) % facts.length;
+  return fact;
+}
+
 /* ------------------------------------------- Motor Heurístico Offline (Fallback Inteligente) */
 function getOfflineAresResponse(query, snap) {
   const q = query.toLowerCase();
@@ -90,6 +128,10 @@ function getOfflineAresResponse(query, snap) {
   const tau = snap.clima_meda.polvo_tau;
   const temp = snap.clima_meda.temp_c;
   const ltst = snap.astronomia_solar.ltst;
+
+  if (q.includes('curioso') || q.includes('dato') || q.includes('robert') || q.includes('rover') || q.includes('sabias') || q.includes('cuéntame') || q.includes('cuentame')) {
+    return getNextRoverFunFact(snap);
+  }
 
   if (q.includes('seguro') || q.includes('estado') || q.includes('viabilidad') || q.includes('riesgo')) {
     if (storm) {
@@ -109,7 +151,7 @@ function getOfflineAresResponse(query, snap) {
   }
 
   if (q.includes('poi') || q.includes('ciencia') || q.includes('muestra') || q.includes('perseverance')) {
-    return `🔬 OFICIAL CIENTÍFICO ARES: El objetivo prioritario detectado es ${snap.navegacion.poi_cercano}. Has completado ${snap.navegacion.muestras_completadas} objetivos de muestreo. Recomiendo aproximarte al Rover Perseverance para enlace de telemetría por radio o al afloramiento CRISM para espectroscopía de filosilicatos.`;
+    return `🔬 OFICIAL CIENTÍFICO ARES: El objetivo prioritario detectado es ${snap.navegacion.poi_cercano}. Has completado ${snap.navegacion.muestras_completadas} objetivos de muestreo. Recomiendo aproximarte al afloramiento cercano y pulsar [E] para espectroscopía.`;
   }
 
   if (q.includes('retorno') || q.includes('evacuar') || q.includes('refugio') || q.includes('volver')) {
@@ -123,7 +165,7 @@ function getOfflineAresResponse(query, snap) {
     return `🗺️ PLANIFICADOR DE NAVEGACIÓN: No hay ruta activa fijada en este momento. Selecciona un punto de Inicio (A) y Destino (B) en el mapa o haz clic en "Travesía Científica" para encadenar los POIs.`;
   }
 
-  return `🎙️ ARES-AI (CAPCOM): Recibido, astronauta. Telemetría de vuelo: O₂ al ${o2}%, clima ${storm ? 'HOSTIL' : 'NOMINAL'} (${temp}°C), hora ${ltst} LTST en ${snap.sitio}. Mantente atento a los avisos de inclinación en el visor. ¿Deseas análisis de ruta o soporte científico?`;
+  return `${getNextRoverFunFact(snap)} (Telemetría: O₂ ${o2}%, ${temp}°C, ${ltst} LTST).`;
 }
 
 /* ------------------------------------------- Consulta a la API de Meta Llama 3 (Groq) */
@@ -195,29 +237,92 @@ export async function queryAresCopilot(userPrompt) {
   }
 }
 
-/* ------------------------------------------- Síntesis de Voz de Radio Espacial */
+/* ------------------------------------------- Síntesis de Voz y Chirp Robótico (Opcional) */
+function playRoverChirp() {
+  if (!voiceEnabled) return;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!audioCtx) audioCtx = new Ctx();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    const now = audioCtx.currentTime;
+    const notes = [587.33, 880.0, 1174.66]; // Re5 - La5 - Re6 (chirp amigable de rover)
+    notes.forEach((freq, i) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.065);
+      gain.gain.setValueAtTime(0.001, now + i * 0.065);
+      gain.gain.exponentialRampToValueAtTime(0.045, now + i * 0.065 + 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.065 + 0.06);
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start(now + i * 0.065);
+      osc.stop(now + i * 0.065 + 0.065);
+    });
+  } catch (_) {
+    /* Ignorar si el navegador bloquea AudioContext */
+  }
+}
+
 export function speakCopilotRadio(text) {
   if (!voiceEnabled || !window.speechSynthesis) return;
 
+  playRoverChirp();
   window.speechSynthesis.cancel();
-  // Limpiar emojis para lectura fluida
-  const cleanText = text.replace(/[\u{1F300}-\u{1F6FF}|[\u{2600}-\u{26FF}]/gu, '');
-  const utterance = new SpeechSynthesisUtterance(cleanText);
 
-  // Buscar voz en español con tono espacial / técnico
+  // Limpiar emojis y símbolos técnicos para lectura fluida en español
+  const cleanText = text
+    .replace(/[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/gu, '')
+    .replace(/DATO CURIOSO/gi, 'Dato curioso:')
+    .replace(/m\/s²/g, 'metros por segundo al cuadrado')
+    .replace(/m\/s/g, 'metros por segundo')
+    .replace(/O₂/g, 'oxígeno')
+    .replace(/CO₂/g, 'dióxido de carbono')
+    .trim();
+
+  const utterance = new SpeechSynthesisUtterance(cleanText);
+  utterance.lang = 'es-MX';
+
   const voices = window.speechSynthesis.getVoices();
-  const esVoice = voices.find((v) => v.lang.startsWith('es')) || voices[0];
+  const esVoice =
+    voices.find((v) => v.lang.startsWith('es') && /paulina|monica|mónica|jorge|angelica|juan/i.test(v.name)) ||
+    voices.find((v) => v.lang.startsWith('es')) ||
+    voices[0];
   if (esVoice) utterance.voice = esVoice;
 
-  utterance.rate = 1.05;
-  utterance.pitch = 0.95;
+  utterance.rate = 1.04;
+  utterance.pitch = 1.02;
   window.speechSynthesis.speak(utterance);
+}
+
+export function syncVoiceButtonsUI() {
+  const voiceBtn = document.getElementById('copilot-voice-btn');
+  const hudAudioBtn = document.getElementById('hud-audio-btn');
+  if (voiceBtn) {
+    voiceBtn.classList.toggle('active', voiceEnabled);
+    voiceBtn.textContent = voiceEnabled ? '🔊 Voz ON' : '🔇 Voz OFF';
+  }
+  if (hudAudioBtn) {
+    hudAudioBtn.classList.toggle('active', voiceEnabled);
+    hudAudioBtn.textContent = voiceEnabled ? '🔊 Audio ON [U]' : '🔇 Audio OFF [U]';
+  }
 }
 
 export function toggleCopilotVoice() {
   voiceEnabled = !voiceEnabled;
   localStorage.setItem(STORAGE_KEY_VOICE, voiceEnabled ? '1' : '0');
-  if (!voiceEnabled && window.speechSynthesis) window.speechSynthesis.cancel();
+  syncVoiceButtonsUI();
+  if (!voiceEnabled && window.speechSynthesis) {
+    window.speechSynthesis.cancel();
+  } else if (voiceEnabled) {
+    const hudTextEl = document.getElementById('hud-radio-text');
+    const hudToast = document.getElementById('hud-radio-toast');
+    if (hudToast && !hudToast.classList.contains('hidden') && hudTextEl?.textContent) {
+      speakCopilotRadio(hudTextEl.textContent);
+    }
+  }
   return voiceEnabled;
 }
 
@@ -225,14 +330,49 @@ export function isCopilotVoiceActive() {
   return voiceEnabled;
 }
 
+/* Hace que Robert (el Rover mascota) comparta un dato curioso en la barra inferior y, si el audio está activo, lo hable */
+export function triggerRoverFunFact() {
+  const snap = getCopilotMissionSnapshot();
+  const fact = getNextRoverFunFact(snap);
+  appendCopilotMessage('ares', fact, 'Rover Robert · Ciencia NASA');
+  showTransmissionOnHUD(fact, '🤖 ROBERT · ROVER PERSEVERANCE');
+  speakCopilotRadio(fact);
+  autoFactTimer_s = 0;
+  return fact;
+}
+
+/* Temporizador automático para que Robert comparta datos curiosos mientras te acompaña en la superficie */
+export function tickRoverCompanionFacts(dt) {
+  if (state.mode !== 'fp') {
+    welcomedInFP = false;
+    autoFactTimer_s = 0;
+    return;
+  }
+
+  autoFactTimer_s += dt;
+  if (!welcomedInFP && autoFactTimer_s >= 2.2) {
+    welcomedInFP = true;
+    autoFactTimer_s = 0;
+    triggerRoverFunFact();
+  } else if (welcomedInFP && autoFactTimer_s >= 32.0) {
+    autoFactTimer_s = 0;
+    triggerRoverFunFact();
+  }
+}
+
 /* ------------------------------------------- Interfaz de Usuario de ARES-AI */
 export function initCopilotUI() {
   const sendBtn       = document.getElementById('copilot-send-btn');
   const inputEl       = document.getElementById('copilot-input');
-  const logEl         = document.getElementById('copilot-messages');
   const settingsBtn   = document.getElementById('copilot-settings-btn');
   const voiceBtn      = document.getElementById('copilot-voice-btn');
+  const hudAudioBtn   = document.getElementById('hud-audio-btn');
+  const hudFactBtn    = document.getElementById('hud-fact-btn');
   const quickPillBtns = document.querySelectorAll('.copilot-quick-btn');
+
+  if (window.speechSynthesis && 'onvoiceschanged' in window.speechSynthesis) {
+    window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices();
+  }
 
   // Modal de configuración de clave API de Llama
   const modalEl     = document.getElementById('copilot-modal');
@@ -241,13 +381,25 @@ export function initCopilotUI() {
   const saveKeyBtn  = document.getElementById('copilot-save-key-btn');
   const closeModBtn = document.getElementById('copilot-close-modal-btn');
 
+  syncVoiceButtonsUI();
+
   if (voiceBtn) {
-    voiceBtn.classList.toggle('active', voiceEnabled);
-    voiceBtn.textContent = voiceEnabled ? '🔊 Voz Radio' : '🔇 Voz Radio';
     voiceBtn.addEventListener('click', () => {
-      const active = toggleCopilotVoice();
-      voiceBtn.classList.toggle('active', active);
-      voiceBtn.textContent = active ? '🔊 Voz Radio' : '🔇 Voz Radio';
+      toggleCopilotVoice();
+    });
+  }
+
+  if (hudAudioBtn) {
+    hudAudioBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleCopilotVoice();
+    });
+  }
+
+  if (hudFactBtn) {
+    hudFactBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      triggerRoverFunFact();
     });
   }
 
@@ -329,11 +481,11 @@ export function initCopilotUI() {
     });
   });
 
-  // Mensaje inicial de bienvenida de ARES-AI
+  // Mensaje inicial de bienvenida de Robert & ARES-AI
   appendCopilotMessage(
     'ares',
-    'ARES-AI en línea. Monitorizando telemetría PLSS, climatología MEDA y navegación A*/QAOA en tiempo real. Pulsa [C] en 1ª persona para radio directa.',
-    localStorage.getItem(STORAGE_KEY_API) ? 'Meta Llama 3 Conectado' : 'Motor Aeroespacial Offline'
+    '🤖 Rover Robert (Perseverance) y ARES-AI en línea. En 1ª/3ª persona te seguiré por la superficie marciana compartiendo datos científicos en la barra inferior. Pulsa [R] para un dato curioso, [U] para activar/silenciar la bocina o [C] para telemetría.',
+    localStorage.getItem(STORAGE_KEY_API) ? 'Meta Llama 3 Conectado' : 'Rover Robert + Motor Offline'
   );
 }
 
@@ -382,12 +534,14 @@ function showTypingIndicator(show) {
   }
 }
 
-/* ------------------------------------------- Proyección en el HUD de 1ª Persona (Visor del Casco) */
-export function showTransmissionOnHUD(text) {
-  const hudToast = document.getElementById('hud-radio-toast');
-  const hudText  = document.getElementById('hud-radio-text');
+/* ------------------------------------------- Barra Inferior de Subtítulos (Robert & ARES-AI) */
+export function showTransmissionOnHUD(text, speakerLabel = '🤖 ROBERT · ROVER PERSEVERANCE') {
+  const hudToast   = document.getElementById('hud-radio-toast');
+  const hudText    = document.getElementById('hud-radio-text');
+  const hudSpeaker = document.getElementById('hud-radio-speaker');
   if (!hudToast || !hudText) return;
 
+  if (hudSpeaker) hudSpeaker.textContent = speakerLabel;
   hudText.textContent = text;
   hudToast.classList.remove('hidden');
   hudToast.classList.add('visible');
@@ -396,5 +550,5 @@ export function showTransmissionOnHUD(text) {
   hudToast._hideTimer = setTimeout(() => {
     hudToast.classList.remove('visible');
     setTimeout(() => hudToast.classList.add('hidden'), 350);
-  }, 9500);
+  }, 14000);
 }

@@ -12,7 +12,7 @@ import { sampleGroundY, sampleDemHeightRelM, sampleSlopeDeg, getSlopeCostFactor 
 import { applyHeights, enableLocalPatch, updateLocalPatchIfNeeded, disableLocalPatch, toggleDustStormSimulation, computeEmergencyEvacuationRoute, applyRouteToScene } from './terrain.js';
 import { spawnAstronaut, updateAstronautThirdPersonVisuals, restoreAstronautOrbitalVisuals } from './astronaut.js';
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
-import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio } from './copilot.js';
+import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio, triggerRoverFunFact, toggleCopilotVoice, tickRoverCompanionFacts } from './copilot.js';
 /* === G1 === */
 import { advanceGroupState, aggregateGroupState, createSoloHealth } from './health_group.js';
 import { computeHealthAwareRoute, compareRoutes, PRESETS } from './health_route_astar.js';
@@ -176,6 +176,14 @@ export function initControls() {
         e.preventDefault();
         togglePerspectiveView();
       }
+      if (e.code === 'KeyR' && !e.repeat) {
+        e.preventDefault();
+        triggerRoverFunFact();
+      }
+      if (e.code === 'KeyU' && !e.repeat) {
+        e.preventDefault();
+        toggleCopilotVoice();
+      }
       /* === G2 === */
       if (e.code === 'KeyM' && !e.repeat) {
         e.preventDefault();
@@ -325,6 +333,7 @@ export function updateControls(dt) {
   if (state.mode === 'fp') {
     evaElapsed_s += dt;
     updateFirstPerson(dt);
+    tickRoverCompanionFacts(dt);
   } else if (state.transition) {
     updateTransition(dt);
     updateOrbitalTelemetry();
@@ -925,7 +934,7 @@ function updateUI() {
       : '🎥 Vista: 1ª Persona [V]';
   }
   hintEl.textContent = isFP
-    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · E = Analizar · C = Radio · T = Tormenta · M = Modo ruta · ESC = Salir'
+    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
 }
