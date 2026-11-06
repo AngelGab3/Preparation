@@ -281,6 +281,8 @@ python -m http.server 8000
 
 | 2026-11-06 | Codex | Portada 3D interactiva: astronauta y cohete sobre isla circular marciana, despegue, expansión del terreno, polvo continuo, música y efecto de motor generados con Web Audio. Al finalizar, botón de entrada al mapa; la escena artística está separada del DEM. | Revisar rendimiento en dispositivos físicos y fidelidad visual del astronauta. |
 
+| 2026-11-06 | Codex | Ampliada la portada a Tierra → viaje interplanetario → aterrizaje en Marte → visor EVA en primera persona. Astronauta articulado, cohete grande, ruta punteada, movimiento de cámara, partículas y audio sintetizado. El botón final abre el mapa. | Medir rendimiento móvil y revisar fidelidad visual del personaje. |
+
 **Decisiones abiertas (no resolverlas sin consultar al equipo)**
 - ¿Zona de estudio definitiva? (Jezero, Gale u otra, o la que entregue la competencia).
 - ¿Resolución objetivo del DEM y tamaño del parche local?

@@ -213,7 +213,7 @@
         📂 Cargar DEM (.tif/.f32)
       </button>
       <button id="replay-cinematic-btn" class="route-btn secondary" type="button"
-        title="Reproducir despegue">
+        title="Reproducir viaje Tierra a Marte">
         🎬 Intro
       </button>
       <input id="upload-dem-input" type="file" accept=".tif,.tiff,.f32" hidden />
@@ -454,9 +454,19 @@
     <div id="signal-3d-stage" class="signal-3d-stage" aria-hidden="true"></div>
     <div class="signal-vignette" aria-hidden="true"></div>
     <header class="signal-top"><div class="signal-brand">MARSWALK <span>EXPLORACIÓN MARCIANA</span></div><button id="signal-sound" type="button" aria-pressed="false">♪ ACTIVAR SONIDO</button></header>
-    <div class="signal-heading"><span class="signal-eyebrow">MISIÓN 01 / SUPERFICIE MARCIANA</span><h1>EL PRIMER<br><em>HORIZONTE.</em></h1><p>Una nueva ruta comienza con un solo impulso.</p></div>
-    <div class="signal-actions"><p id="signal-hint" role="status">PULSA EL ASTRONAUTA O EL COHETE PARA COMENZAR</p><button id="signal-start" type="button">INICIAR DESPEGUE <span>↗</span></button><button id="signal-continue" type="button" hidden>CONTINUAR AL MAPA <span>↗</span></button><button id="signal-replay" type="button">↺ REPETIR</button></div>
-    <div class="signal-side" aria-hidden="true">01 / MARTE <span>◉</span> 02 / MAPA</div>
+    <div class="signal-heading">
+      <span id="signal-kicker" class="signal-eyebrow">01 / TIERRA</span>
+      <h1 id="signal-title">LA MISIÓN COMIENZA</h1>
+      <p id="signal-subtitle">Haz clic en el astronauta o en el cohete para comenzar.</p>
+    </div>
+    <div class="signal-actions">
+      <p id="signal-hint" role="status">PULSA UNA FIGURA PARA INICIAR</p>
+      <button id="signal-start" type="button">COMENZAR VIAJE <span>↗</span></button>
+      <button id="signal-continue" type="button" hidden>IR AL MAPA PRINCIPAL <span>↗</span></button>
+      <button id="signal-replay" type="button">↺ REPETIR VIAJE</button>
+    </div>
+    <div class="signal-visor" aria-hidden="true"><div class="signal-visor-cross">+</div><span>EVA // SUPERFICIE MARCIANA</span></div>
+    <div class="signal-side" aria-hidden="true">01 / TIERRA <span>···</span> 02 / TRAYECTO <span>···</span> 03 / MARTE</div>
   </section>
   <p id="intro-feedback" class="intro-feedback" role="alert" hidden></p>
 

@@ -1,90 +1,195 @@
 import * as T from 'three';
 import { state } from './state.js';
 import { createExplorer } from './character-lab/character.js';
-const $=s=>document.querySelector(s), ui=$('#intro-cinematic');
-let active=false, started=false, elapsed=0, total=0, last=0, savedFocus, savedOrbit, siblings=[];
-let renderer,scene,camera,astronaut,rocket,flame,portal,ring,dust,stars, sound, ctx, musicTimer;
-const reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const smooth=x=>{x=Math.max(0,Math.min(1,x));return x*x*(3-2*x)};
-const mat=(c,metal=0)=>new T.MeshStandardMaterial({color:c,roughness:.73,metalness:metal,flatShading:true});
-const orange=mat(0xd96740), cream=mat(0xe9ddd0),dark=mat(0x292331),bronze=mat(0xf1bb69,.25);
-function mesh(parent,g,m,x=0,y=0,z=0){const o=new T.Mesh(g,m);o.position.set(x,y,z);o.castShadow=true;parent.add(o);return o}
-function makeRocket(){
- const g=new T.Group();g.position.set(.75,.3,-.2);scene.add(g);
- mesh(g,new T.CylinderGeometry(.17,.21,1.05,12),cream,0,.63);
- mesh(g,new T.ConeGeometry(.175,.38,12),orange,0,1.34);
- mesh(g,new T.CylinderGeometry(.21,.21,.14,12),dark,0,.09);
- mesh(g,new T.CylinderGeometry(.07,.07,.3,12),dark,0,-.12);
- for(let i=0;i<3;i++){const f=mesh(g,new T.BoxGeometry(.09,.38,.33),orange,0,.27,.26);f.rotation.y=i*Math.PI*2/3;f.position.set(Math.sin(i*Math.PI*2/3)*.2,.28,Math.cos(i*Math.PI*2/3)*.2)}
- for(let y of [.42,.85]) mesh(g,new T.TorusGeometry(.18,.018,5,24),bronze,0,y).rotation.x=Math.PI/2;
- mesh(g,new T.SphereGeometry(.09,12,8),dark,0,.82,.174);
- flame=mesh(g,new T.ConeGeometry(.12,.65,9),new T.MeshBasicMaterial({color:0xffbd66,transparent:true,opacity:.9}),0,-.46);
- flame.rotation.z=Math.PI;flame.visible=false;
- return g;
+
+const ui=document.querySelector('#intro-cinematic');
+const el=id=>ui.querySelector('#'+id);
+const clamp=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const ease=v=>{v=clamp(v);return v*v*(3-2*v)};
+const mix=(a,b,t)=>a+(b-a)*t;
+const V=(x,y,z)=>new T.Vector3(x,y,z);
+const material=(color,metalness=0)=>new T.MeshStandardMaterial({color,roughness:.82,metalness,flatShading:true});
+const cream=material(0xe9e3da), ink=material(0x293342), orange=material(0xd67852), brass=material(0xe7bd87,.25);
+let active=false,playing=false,elapsed=0,lastFrame=0,elapsedTotal=0,ready=false;
+let scene,camera,renderer,earthGroup,marsGroup,solarGroup,fpTerrain,explorer,actor,rocket,route,solarRocket,dust,outerStars;
+let audioContext,audioMaster,musicLoop,prevPhase='',savedFocus,savedOrbit,siblings=[];
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const duration=33;
+
+function add(parent,geometry,mat,x=0,y=0,z=0){
+ const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
 }
-function makePortal(){
- const n=72,rings=42,positions=[],colors=[],indices=[];
- const center=new T.Color(0xf18d57),edge=new T.Color(0x883d40);
- for(let j=0;j<=rings;j++){const r=j/rings*3;for(let i=0;i<=n;i++){const a=i/n*Math.PI*2,x=Math.cos(a)*r,z=Math.sin(a)*r;
- const noise=Math.sin(x*2.7)*Math.cos(z*3.1)*.12+Math.sin(x*8+z*5)*.035;
- const y=.03+noise*(.15+.85*j/rings);
- positions.push(x,y,z);const c=center.clone().lerp(edge,j/rings*.82+Math.sin(a*7+r*5)*.07);colors.push(c.r,c.g,c.b);
- if(j<rings&&i<n){let k=j*(n+1)+i;indices.push(k,k+n+1,k+1,k+1,k+n+1,k+n+2)}
- }}
- const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));geo.setAttribute('color',new T.Float32BufferAttribute(colors,3));geo.setIndex(indices);geo.computeVertexNormals();
- portal=mesh(scene,geo,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide,flatShading:true}));portal.scale.setScalar(.84);portal.receiveShadow=true;
- ring=mesh(scene,new T.TorusGeometry(3.02,.024,6,96),new T.MeshBasicMaterial({color:0xffdcb0}),0,.015);ring.rotation.x=Math.PI/2;ring.scale.setScalar(.84);
- const rim=mesh(scene,new T.CylinderGeometry(2.96,2.85,.16,72,1,true),mat(0x62343c),0,-.1);rim.scale.set(.84,1,.84);rim.material.side=T.DoubleSide;
- return rim;
+function circleTerrain(group,earth){
+ const n=96,steps=40,positions=[],colors=[],indices=[];
+ const green=new T.Color(0x79935d),blue=new T.Color(0x385d6e),red=new T.Color(0xb85640),sand=new T.Color(0xe39a6f);
+ for(let j=0;j<=steps;j++)for(let i=0;i<=n;i++){
+  const r=3*j/steps,a=i/n*Math.PI*2,x=r*Math.cos(a),z=r*Math.sin(a);
+  const h=Math.sin(x*2.2)*Math.cos(z*2.5)*.08+Math.sin(x*7+z*4)*.025;
+  positions.push(x,h+.03,z);
+  const wet=Math.sin(x*2.8+z)*Math.cos(z*3.4-x*1.2);
+  const c=earth?(wet>.43?blue.clone():green.clone().multiplyScalar(1+.14*Math.sin(x*4+z*3))):red.clone().lerp(sand,.24+.26*Math.sin(x*3+z*4));
+  colors.push(c.r,c.g,c.b);
+  if(j<steps&&i<n){const k=j*(n+1)+i;indices.push(k,k+n+1,k+1,k+1,k+n+1,k+n+2)}
+ }
+ const g=new T.BufferGeometry();g.setAttribute('position',new T.Float32BufferAttribute(positions,3));g.setAttribute('color',new T.Float32BufferAttribute(colors,3));g.setIndex(indices);g.computeVertexNormals();
+ add(group,g,new T.MeshStandardMaterial({vertexColors:true,side:T.DoubleSide,roughness:1,flatShading:true}));
+ const border=add(group,new T.TorusGeometry(3.025,.028,6,100),new T.MeshBasicMaterial({color:earth?0xdef1b7:0xffcaa1}),0,.02);border.rotation.x=Math.PI/2;
+ const rim=add(group,new T.CylinderGeometry(3,2.94,.22,96,1,true),material(earth?0x405844:0x713c38),0,-.09);rim.material.side=T.DoubleSide;
+ if(earth){
+  for(let i=0;i<20;i++){const a=i*2.399,r=Math.sqrt((i+.3)/20)*2.6;
+   const tuft=add(group,new T.ConeGeometry(.035,.11,5),material(i%3?0x496e4a:0xa9a56b),Math.cos(a)*r,.07,Math.sin(a)*r);tuft.rotation.z=.13;
+  }
+ }else{
+  for(let i=0;i<35;i++){const a=i*2.399,r=Math.sqrt((i+.2)/35)*2.65;
+   add(group,new T.DodecahedronGeometry(.035+(i%4)*.017,0),material(i%2?0x874940:0xd18961),Math.cos(a)*r,.07,Math.sin(a)*r);
+  }
+ }
 }
-function particles(){
- const count=260,p=new Float32Array(count*3);for(let i=0;i<count;i++){const a=Math.random()*Math.PI*2,r=Math.sqrt(Math.random())*2.7;p[i*3]=Math.cos(a)*r;p[i*3+1]=Math.random()*1.8;p[i*3+2]=Math.sin(a)*r}
- const geo=new T.BufferGeometry();geo.setAttribute('position',new T.BufferAttribute(p,3));
- dust=new T.Points(geo,new T.PointsMaterial({color:0xffba78,size:.055,transparent:true,opacity:.8,depthWrite:false}));scene.add(dust);
- const sp=[];for(let i=0;i<160;i++)sp.push((Math.random()-.5)*20,Math.random()*6-1,(Math.random()-.5)*20);
- const sg=new T.BufferGeometry();sg.setAttribute('position',new T.Float32BufferAttribute(sp,3));stars=new T.Points(sg,new T.PointsMaterial({color:0x8d637e,size:.025}));scene.add(stars);
+function makeRocket(parent){
+ const root=new T.Group();parent.add(root);
+ add(root,new T.CylinderGeometry(.28,.34,1.85,16),cream,0,1.15);
+ add(root,new T.ConeGeometry(.28,.56,16),orange,0,2.35);
+ add(root,new T.CylinderGeometry(.35,.35,.18,16),ink,0,.17);
+ add(root,new T.CylinderGeometry(.15,.15,.25,16),ink,0,-.02);
+ for(let i=0;i<4;i++){const a=i*Math.PI/2;const fin=add(root,new T.BoxGeometry(.13,.7,.58),orange,Math.sin(a)*.29,.48,Math.cos(a)*.29);fin.rotation.y=a}
+ for(const y of [.7,1.68]){const stripe=add(root,new T.TorusGeometry(.29,.025,5,28),brass,0,y);stripe.rotation.x=Math.PI/2}
+ add(root,new T.SphereGeometry(.14,14,10),ink,0,1.57,.275);
+ const nozzle=add(root,new T.ConeGeometry(.16,.8,10),new T.MeshBasicMaterial({color:0xffb660,transparent:true,opacity:.95}),0,-.42);nozzle.rotation.z=Math.PI;nozzle.visible=false;
+ return {root,nozzle};
 }
-function initScene(){
- scene=new T.Scene();scene.background=new T.Color(0x201824);scene.fog=new T.Fog(0x201824,9,22);
- camera=new T.PerspectiveCamera(38,innerWidth/innerHeight,.1,60);camera.position.set(5.6,5.2,8);camera.lookAt(0,.65,0);
- renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.setSize(innerWidth,innerHeight);renderer.shadowMap.enabled=true;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.25;$('#signal-3d-stage').appendChild(renderer.domElement);
- scene.add(new T.HemisphereLight(0xffc69d,0x312a42,2.7));const sun=new T.DirectionalLight(0xffd1a8,3);sun.position.set(4,8,5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-9;sun.shadow.camera.right=9;sun.shadow.camera.top=9;sun.shadow.camera.bottom=-9;scene.add(sun);
- const grid=new T.GridHelper(40,40,0x754262,0x61344d);grid.position.y=-.22;scene.add(grid);
- makePortal();rocket=makeRocket();astronaut=createExplorer();astronaut.root.position.x=-.77;astronaut.root.position.z=.25;scene.add(astronaut.root);particles();
+function globe(group,x,r,color,accent){
+ const main=add(group,new T.SphereGeometry(r,24,16),material(color),x,0,0);
+ for(let i=0;i<10;i++){const a=i*2.399,y=Math.sin(i*1.7)*r*.6;
+  const patch=add(main,new T.DodecahedronGeometry(r*(.12+i%3*.035),0),material(accent),Math.cos(a)*r*.87,y,Math.sin(a)*r*.87);
+  patch.scale.set(1.3,.45,.8);
+ }
+ return main;
+}
+function makeSolar(){
+ solarGroup=new T.Group();scene.add(solarGroup);
+ globe(solarGroup,-6.2,1.14,0xeabd69,0xffde9e);
+ globe(solarGroup,-3.1,.57,0x326fa1,0x70a367);
+ globe(solarGroup,3.2,.45,0xc56c4d,0xe69e74);
+ const sun=solarGroup.children[0];sun.material.emissive=new T.Color(0xb66d33);sun.material.emissiveIntensity=.75;
+ for(const r of [3.1,6.4]){const curve=new T.EllipseCurve(-6.2,0,r,r*.32,0,Math.PI*2);const points=curve.getPoints(120).map(v=>V(v.x,-.7,v.y));const line=new T.LineLoop(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:0x645362,transparent:true,opacity:.45}));solarGroup.add(line)}
+ const points=[];for(let i=0;i<=90;i++){const u=i/90;points.push(V(mix(-3.1,3.2,u),.28+2.1*Math.sin(Math.PI*u),1.25+Math.sin(Math.PI*u)*.65))}
+ route=new T.CatmullRomCurve3(points);
+ const routeLine=new T.Line(new T.BufferGeometry().setFromPoints(route.getPoints(150)),new T.LineDashedMaterial({color:0xf9b68e,dashSize:.1,gapSize:.09,transparent:true,opacity:.85}));routeLine.computeLineDistances();solarGroup.add(routeLine);
+ const marker=add(solarGroup,new T.SphereGeometry(.08,12,8),new T.MeshBasicMaterial({color:0xffe9b2}),-3.1,.3,1.25);marker.name='route-marker';
+ solarRocket=makeRocket(solarGroup);solarRocket.root.scale.setScalar(.38);solarRocket.root.position.copy(points[0]);solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
+ const labelMaterial=new T.MeshBasicMaterial({color:0xf6d1b1});
+ for(const [x,r] of [[-6.2,1.35],[-3.1,.78],[3.2,.65]]){const ring=add(solarGroup,new T.TorusGeometry(r,.008,4,60),labelMaterial,x,0);ring.rotation.x=Math.PI/2}
+}
+function makeFpTerrain(){
+ const geometry=new T.PlaneGeometry(100,100,90,90);geometry.rotateX(-Math.PI/2);
+ const pos=geometry.attributes.position,colors=[];
+ const low=new T.Color(0x944333),high=new T.Color(0xd98257);
+ for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),h=Math.sin(x*.5)*Math.cos(z*.4)*.34+Math.sin(x*1.8+z*1.1)*.11+Math.max(0,-z-9)*.025;
+  pos.setY(i,h);const c=low.clone().lerp(high,clamp(.42+h*.38));colors.push(c.r,c.g,c.b)}
+ geometry.setAttribute('color',new T.Float32BufferAttribute(colors,3));geometry.computeVertexNormals();
+ fpTerrain=add(scene,geometry,new T.MeshStandardMaterial({vertexColors:true,roughness:1,side:T.DoubleSide,flatShading:true}));fpTerrain.visible=false;
+ for(let i=0;i<28;i++){const x=Math.sin(i*2.4)*((i%5)+2),z=-2-(i%7)*2;
+  add(fpTerrain,new T.DodecahedronGeometry(.16+(i%4)*.1,0),material(i%2?0x763d35:0xb86649),x,.1,z);
+ }
+}
+function makeParticles(){
+ const positions=[];for(let i=0;i<350;i++){const a=i*2.399,r=Math.sqrt((i%90)/90)*4;positions.push(Math.cos(a)*r,(i%31)/31*2.5,Math.sin(a)*r)}
+ const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
+ dust=new T.Points(geo,new T.PointsMaterial({color:0xe2a27b,size:.046,transparent:true,opacity:.8,depthWrite:false}));scene.add(dust);
+ const stars=[];for(let i=0;i<200;i++)stars.push((Math.random()-.5)*24,(Math.random()-.5)*12,(Math.random()-.5)*14-2);
+ outerStars=new T.Points(new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(stars,3)),new T.PointsMaterial({color:0xc9aac2,size:.027}));scene.add(outerStars);
+}
+function initWorld(){
+ scene=new T.Scene();scene.background=new T.Color(0x1a2430);scene.fog=new T.Fog(0x1a2430,16,65);
+ camera=new T.PerspectiveCamera(42,innerWidth/innerHeight,.04,120);
+ renderer=new T.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.shadowMap.enabled=true;renderer.toneMapping=T.ACESFilmicToneMapping;renderer.toneMappingExposure=1.22;el('signal-3d-stage').appendChild(renderer.domElement);
+ scene.add(new T.HemisphereLight(0xffe1bd,0x4a5260,2.5));const sun=new T.DirectionalLight(0xffefc9,3);sun.position.set(4,8,5);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-12;sun.shadow.camera.right=12;sun.shadow.camera.top=12;sun.shadow.camera.bottom=-12;scene.add(sun);
+ earthGroup=new T.Group();scene.add(earthGroup);circleTerrain(earthGroup,true);
+ marsGroup=new T.Group();scene.add(marsGroup);circleTerrain(marsGroup,false);
+ makeSolar();makeFpTerrain();makeParticles();
+ rocket=makeRocket(scene);rocket.root.position.set(1.1,.15,-.2);
+ explorer=createExplorer();actor=new T.Group();actor.position.set(-1.5,0,.35);actor.add(explorer.root);scene.add(actor);
+ const grid=new T.GridHelper(40,40,0x5d6970,0x40505d);grid.position.y=-.24;scene.add(grid);
  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
- const ray=new T.Raycaster(),pointer=new T.Vector2();
- renderer.domElement.addEventListener('pointerup',e=>{if(started||!active)return;pointer.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(pointer,camera);if(ray.intersectObjects([rocket,astronaut.root],true).length)launch()});
- renderer.domElement.style.cursor='pointer';requestAnimationFrame(frame);
+ const ray=new T.Raycaster(),p=new T.Vector2();
+ renderer.domElement.addEventListener('pointerup',e=>{if(!active||playing||ready)return;p.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(p,camera);if(ray.intersectObjects([rocket.root,actor],true).length)start()});
+ requestAnimationFrame(frame);
 }
 function audioOn(){
- if(sound)return;ctx=new AudioContext();const master=ctx.createGain();master.gain.value=.16;master.connect(ctx.destination);
- const tones=[110,164.81,220,261.63],osc=[];
- tones.forEach((f,i)=>{const o=ctx.createOscillator(),g=ctx.createGain();o.type=i?'sine':'triangle';o.frequency.value=f;g.gain.value=i===0?.08:.024;o.connect(g).connect(master);o.start();osc.push(o)});
- musicTimer=setInterval(()=>{if(!active||!ctx)return;const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sine';o.frequency.value=tones[Math.floor(total*1.2)%tones.length]*2;g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.04,t+.04);g.gain.exponentialRampToValueAtTime(.0001,t+.8);o.connect(g).connect(master);o.start(t);o.stop(t+.85)},700);
- sound={master,osc};
+ if(audioContext)return;
+ try{audioContext=new (window.AudioContext||window.webkitAudioContext)();audioMaster=audioContext.createGain();audioMaster.gain.value=.24;audioMaster.connect(audioContext.destination);
+ const chord=[110,164.8,220];for(const [i,f] of chord.entries()){const o=audioContext.createOscillator(),g=audioContext.createGain();o.type=i?'sine':'triangle';o.frequency.value=f;g.gain.value=i===0?.08:.02;o.connect(g).connect(audioMaster);o.start()}
+ musicLoop=setInterval(()=>{if(!active||!audioContext)return;tone([220,261.6,329.6,392][Math.floor(elapsedTotal*1.5)%4],.7,.04)},680);
+ }catch{audioContext=null}
 }
-function whoosh(){if(!ctx)return;const t=ctx.currentTime,o=ctx.createOscillator(),g=ctx.createGain();o.type='sawtooth';o.frequency.setValueAtTime(65,t);o.frequency.exponentialRampToValueAtTime(240,t+1.7);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(.055,t+.12);g.gain.exponentialRampToValueAtTime(.0001,t+2.4);o.connect(g).connect(sound.master);o.start(t);o.stop(t+2.5)}
-function launch(){if(started)return;started=true;elapsed=0;$('#signal-start').hidden=true;$('#signal-hint').textContent='DESPEGUE EN CURSO · ABRIENDO SUPERFICIE';ui.classList.add('launched');if(!reduce){audioOn();$('#signal-sound').textContent='♪ SONIDO ACTIVADO';$('#signal-sound').setAttribute('aria-pressed','true');whoosh()}else{elapsed=7;ready()}}
-function ready(){ui.classList.add('ready');$('#signal-hint').textContent='SUPERFICIE MARCIANA DISPONIBLE';$('#signal-continue').hidden=false;$('#signal-continue').focus({preventScroll:true})}
-function frame(now){requestAnimationFrame(frame);const dt=Math.min(.05,(now-last)/1000||0);last=now;if(!active)return;
- total+=dt;if(started&&elapsed<7.1){elapsed+=dt;if(elapsed>=7.1)ready()}
- const t=elapsed,open=smooth((t-.25)/3.3),lift=Math.max(0,t-.35);portal.scale.setScalar(.84+open*3.1);ring.scale.setScalar(.84+open*3.1);
- rocket.position.y=.3+lift*lift*.27;rocket.rotation.z=-Math.min(.42,lift*.08);flame.visible=started&&t<6;flame.scale.y=.8+Math.sin(total*28)*.2;
- astronaut.root.position.x=-.77;astronaut.root.position.z=.25;astronaut.pose(total%5,'idle');
- const arr=dust.geometry.attributes.position;for(let i=0;i<arr.count;i++){let y=arr.getY(i)+dt*(.25+(i%9)*.06);if(y>3.2)y=.02;arr.setY(i,y)}arr.needsUpdate=true;dust.rotation.y+=dt*.04;
- camera.position.x=5.6+open*.8;camera.position.y=5.2+open*1.5;camera.position.z=8+open*2;camera.lookAt(0,.55,0);renderer.render(scene,camera);
+function tone(f,d=.3,volume=.12,type='sine'){if(!audioContext)return;const t=audioContext.currentTime,o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(type==='sawtooth')o.frequency.exponentialRampToValueAtTime(f*2,t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(audioMaster);o.start(t);o.stop(t+d+.02)}
+function syncAudioLabel(){const on=audioContext&&audioMaster.gain.value>0;el('signal-sound').textContent=on?'♪ SONIDO ACTIVADO':'♪ ACTIVAR SONIDO';el('signal-sound').setAttribute('aria-pressed',String(!!on))}
+function setText(chapter,title,sub,hint){el('signal-kicker').textContent=chapter;el('signal-title').textContent=title;el('signal-subtitle').textContent=sub;el('signal-hint').textContent=hint}
+function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
+function finish(){if(ready)return;ready=true;playing=false;ui.classList.add('is-ready');setText('04 / SUPERFICIE MARCIANA','EL NUEVO HORIZONTE','El terreno te espera. Continúa al mapa para explorar.','VISOR EVA ACTIVO · SUPERFICIE DISPONIBLE');el('signal-continue').hidden=false;el('signal-continue').focus({preventScroll:true});tone(392,.6,.06)}
+function reset(){playing=false;ready=false;elapsed=0;prevPhase='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
+function phaseUpdate(phase){
+ if(phase===prevPhase)return;prevPhase=phase;ui.dataset.phase=phase;
+ if(phase==='earth')setText('01 / TIERRA','EL PRIMER PASO','El astronauta se dirige al cohete.','RUMBO A MARTE · PREPARANDO DESPEGUE');
+ if(phase==='solar'){setText('02 / VIAJE INTERPLANETARIO','RUMBO A MARTE','Sigue la ruta punteada a través del sistema solar.','TRAYECTORIA TIERRA → MARTE');tone(70,2.2,.08,'sawtooth')}
+ if(phase==='mars'){setText('03 / ATERRIZAJE','MARTE A LA VISTA','El cohete toca suelo y el astronauta desciende.','APROXIMACIÓN FINAL · SUPERFICIE MARCIANA');tone(90,1.5,.07,'sawtooth')}
+ if(phase==='visor'){setText('04 / VISOR EVA','UN NUEVO MUNDO','La cámara entra en el casco. El paisaje se abre ante ti.','TRANSICIÓN A PRIMERA PERSONA');tone(280,.8,.05)}
+}
+function frame(now){
+ requestAnimationFrame(frame);const dt=Math.min(.05,(now-lastFrame)/1000||0);lastFrame=now;if(!active)return;
+ elapsedTotal+=dt;if(playing&&!ready){elapsed=Math.min(duration,elapsed+dt);if(elapsed>=duration)finish()}
+ const t=elapsed,phase=t<8?'earth':t<17?'solar':t<26?'mars':'visor';phaseUpdate(phase);
+ const inEarth=phase==='earth',inSolar=phase==='solar',inMars=phase==='mars',inVisor=phase==='visor';
+ earthGroup.visible=inEarth;solarGroup.visible=inSolar;marsGroup.visible=inMars||inVisor;
+ fpTerrain.visible=inVisor&&t>29;
+ outerStars.visible=inSolar;dust.visible=!inSolar;
+ scene.background.setHex(inSolar?0x100f20:inEarth?0x1a2430:0x35232b);
+ scene.fog.color.copy(scene.background);
+ const walk=ease((t-1)/3.4),launch=ease((t-4.8)/3.1),travel=ease((t-8)/9),land=ease((t-17)/5.5),exit=ease((t-22)/3);
+ if(inEarth){
+  actor.visible=t<5.15;if(t<4.4)explorer.pose(Math.min(3.6,Math.max(0,t-1)),'walk');else explorer.pose(elapsedTotal,'idle');actor.position.set(mix(-1.5,-.3,walk),0,.35);actor.rotation.y=-.65;
+  rocket.root.visible=true;rocket.root.position.set(1.1,.15+launch*13,-.2);rocket.root.rotation.set(0,0,-launch*.18);rocket.nozzle.visible=t>4.8;
+  camera.position.set(5.5+launch*.7,5.4+launch*1.2,9+launch*1.6);camera.lookAt(0,.65+launch*1.8,0);
+ }else if(inSolar){
+  actor.visible=false;rocket.root.visible=false;solarRocket.root.position.copy(route.getPoint(travel));solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
+  solarGroup.children.find(c=>c.name==='route-marker').position.copy(route.getPoint(travel));
+  camera.position.set(0,4.7,15.5);camera.lookAt(-1,.25,0);
+ }else if(inMars){
+  marsGroup.scale.setScalar(1+land*.1);actor.visible=t>22;explorer.pose(Math.max(0,t-22),'walk');actor.position.set(mix(1.2,.05,exit),0,.2);actor.rotation.y=-.8;
+  rocket.root.visible=true;rocket.root.position.set(1.35, .15+(1-land)*5.5,-.2);rocket.root.rotation.set(0,0,(1-land)*.14);rocket.nozzle.visible=t<22;
+  camera.position.set(mix(5.5,4.1,land),mix(7.3,3.2,land),mix(10,7.5,land));camera.lookAt(0,mix(1.8,.65,land),0);
+ }else{
+  rocket.root.visible=t<30;actor.visible=t<30;
+  explorer.pose(elapsedTotal,'idle');actor.position.set(.05,0,.2);actor.rotation.y=0;
+  const toward=ease((t-26)/3.6);
+  marsGroup.scale.setScalar(1+ease((t-26)/3.1)*6);
+  const from=V(3.8,3.1,6.4),to=V(.05,1.7,.45);camera.position.copy(from.lerp(to,toward));
+  camera.fov=mix(42,68,toward);camera.updateProjectionMatrix();
+  camera.lookAt(V(mix(0,.05,toward),mix(.8,1.45,toward),mix(0,-8,toward)));
+  if(t>29){ui.classList.add('is-visor');fpTerrain.visible=true}
+ }
+ if(!inVisor&&camera.fov!==42){camera.fov=42;camera.updateProjectionMatrix();ui.classList.remove('is-visor')}
+ const arr=dust.geometry.attributes.position;for(let i=0;i<arr.count;i++){let y=arr.getY(i)+dt*(.22+(i%7)*.06);if(y>3.4)y=.01;arr.setY(i,y)}arr.needsUpdate=true;dust.rotation.y+=dt*.06;
+ renderer.render(scene,camera);
 }
 export const isIntroCinematicActive=()=>active;
 export function initIntroCinematic(){
- if(!ui)return;initScene();$('#signal-start').onclick=launch;$('#signal-continue').onclick=stopIntroCinematic;
- $('#signal-sound').onclick=async e=>{if(!ctx){audioOn();await ctx.resume();e.currentTarget.textContent='♪ SONIDO ACTIVADO';e.currentTarget.setAttribute('aria-pressed','true')}else{const muted=sound.master.gain.value>0;sound.master.gain.value=muted?0:.16;e.currentTarget.textContent=muted?'♪ ACTIVAR SONIDO':'♪ SONIDO ACTIVADO';e.currentTarget.setAttribute('aria-pressed',String(!muted))}};
- $('#signal-replay').onclick=()=>{started=false;elapsed=0;ui.classList.remove('ready','launched');$('#signal-start').hidden=false;$('#signal-continue').hidden=true;$('#signal-hint').textContent='PULSA EL ASTRONAUTA O EL COHETE PARA COMENZAR';rocket.position.y=.3;rocket.rotation.z=0;portal.scale.setScalar(.84);ring.scale.setScalar(.84)};
- document.getElementById('replay-cinematic-btn')?.addEventListener('click',()=>startIntroCinematic(true));
- document.addEventListener('visibilitychange',()=>{if(document.hidden&&ctx)ctx.suspend();else if(active&&ctx)ctx.resume()});
- const params=new URLSearchParams(location.search);if(params.get('nointro')!=='1')startIntroCinematic();
+ if(!ui)return;initWorld();
+ el('signal-start').onclick=start;el('signal-continue').onclick=stopIntroCinematic;el('signal-replay').onclick=reset;
+ el('signal-sound').onclick=()=>{if(!audioContext){audioOn();audioContext?.resume()}else audioMaster.gain.value=audioMaster.gain.value>0?0:.24;syncAudioLabel()};
+ document.getElementById('replay-cinematic-btn')?.addEventListener('click',()=>startIntroCinematic());
+ document.addEventListener('visibilitychange',()=>{if(!audioContext)return;if(document.hidden)audioContext.suspend();else if(active)audioContext.resume()});
+ if(new URLSearchParams(location.search).get('nointro')!=='1')startIntroCinematic();
 }
-export function startIntroCinematic(){if(active||state.mode==='fp')return;active=true;started=false;elapsed=0;total=0;ui.classList.remove('ready','launched');$('#signal-start').hidden=false;$('#signal-continue').hidden=true;
- savedFocus=document.activeElement;savedOrbit=state.orbitControls.enabled;state.orbitControls.enabled=false;siblings=[...document.body.children].filter(el=>el!==ui&&!['SCRIPT','STYLE'].includes(el.tagName)).map(el=>[el,el.inert]);siblings.forEach(([el])=>el.inert=true);document.body.classList.add('intro-playing');ui.classList.remove('hidden');$('#signal-start').focus({preventScroll:true})}
+export function startIntroCinematic(){
+ if(active||state.mode==='fp')return;active=true;elapsedTotal=0;reset();
+ savedFocus=document.activeElement;savedOrbit=state.orbitControls.enabled;state.orbitControls.enabled=false;
+ siblings=[...document.body.children].filter(node=>node!==ui&&!['SCRIPT','STYLE'].includes(node.tagName)).map(node=>[node,node.inert]);siblings.forEach(([node])=>node.inert=true);
+ document.body.classList.add('intro-playing');ui.classList.remove('hidden');el('signal-start').focus({preventScroll:true});
+}
 export function tickIntroCinematic(){}
-export function stopIntroCinematic(){if(!active)return;active=false;ui.classList.add('hidden');document.body.classList.remove('intro-playing');siblings.forEach(([el,v])=>el.inert=v);siblings=[];state.orbitControls.enabled=savedOrbit;
- if(ctx){clearInterval(musicTimer);sound.osc.forEach(o=>o.stop());ctx.close();ctx=null;sound=null}try{sessionStorage.setItem('marswalk.signal.v3','seen')}catch{}(savedFocus?.tagName==='BUTTON'?savedFocus:document.getElementById('mode-btn'))?.focus({preventScroll:true})}
+export function stopIntroCinematic(){
+ if(!active)return;active=false;ui.classList.add('hidden');document.body.classList.remove('intro-playing');siblings.forEach(([node,inert])=>node.inert=inert);siblings=[];state.orbitControls.enabled=savedOrbit;
+ if(audioContext){clearInterval(musicLoop);audioContext.close();audioContext=null;audioMaster=null}
+ (savedFocus?.tagName==='BUTTON'?savedFocus:document.getElementById('mode-btn'))?.focus({preventScroll:true});
+}

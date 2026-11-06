@@ -60,10 +60,10 @@ python3 data_pipeline/validate_contracts.py
 - **HUD EVA en tiempo real:** Reserva y flujo metabólico de $\text{O}_2$ según pendiente e inclinación de marcha, alerta de pendiente crítica ($> 25^\circ$), pulso cardíaco, brújula y mini-radar topográfico de $2 \times 2\text{ km}$ con ruta y POIs cercanos.
 
 
-## Pantalla de inicio interactiva
+## Pantalla de inicio: Tierra → Marte → visor EVA
 
-La portada muestra un astronauta 3D articulado y un cohete sobre una isla circular de terreno marciano. Al pulsar una figura o «Iniciar despegue», el cohete asciende, el círculo se expande y las partículas de polvo continúan en movimiento. La música y el efecto del motor se sintetizan con Web Audio después del primer clic. «Continuar al mapa» aparece al finalizar la secuencia; «Repetir» la reinicia.
+La portada narra tres escenas 3D. En la Tierra, el astronauta camina hacia un cohete de mayor tamaño y este despega. El viaje muestra Sol, Tierra, Marte y la ruta punteada del cohete. En Marte, el cohete aterriza, el astronauta sale y la cámara avanza hasta su visor. La secuencia termina con terreno marciano en primera persona, polvo en movimiento y el botón «Ir al mapa principal». La música y los efectos sintetizados con Web Audio comienzan tras la interacción del usuario; «Repetir viaje» reinicia la historia.
 
-Ejecutar con `npm install && npm run dev` y abrir `http://localhost:8000/?dataset=jezero_test`. `?nointro=1` abre el mapa directamente. El suelo de la portada es una representación artística y no utiliza el DEM científico del mapa.
+Ejecutar con `npm install && npm run dev` y abrir `http://localhost:8000/?dataset=jezero_test`. `?nointro=1` abre el mapa directamente. Los terrenos y planetas de la introducción son representaciones artísticas; el DEM científico solo se utiliza en el mapa principal.
 
-Se verificó en la versión Vite el despegue, la expansión del terreno, el botón final y el acceso al mapa. También pasaron lint, build, contratos de datos y las 37 pruebas de Node. La apariencia del astronauta es estilizada respecto de la imagen de referencia. Falta medir rendimiento en dispositivos físicos.
+La secuencia se comprobó visualmente en Vite desde la Tierra hasta el visor EVA; también se verificó el botón final y el acceso al mapa. El mapa conserva su cargador y controles. La apariencia del astronauta sigue siendo estilizada respecto de la referencia aprobada. Falta validar rendimiento y audio en dispositivos físicos.
