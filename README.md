@@ -58,3 +58,12 @@ python3 data_pipeline/validate_contracts.py
 - **Entrar:** Doble clic sobre el marcador del astronauta (o botón **«Entrar en 1ª persona»** del popup).
 - **Movimiento:** `W` `A` `S` `D` o flechas para caminar ($1.2\text{ m/s}$), `Shift` para correr ($2.5\text{ m/s}$), `Espacio` para saltar ($g = 3.71\text{ m/s}^2$), `Esc` para volver a la vista orbital.
 - **HUD EVA en tiempo real:** Reserva y flujo metabólico de $\text{O}_2$ según pendiente e inclinación de marcha, alerta de pendiente crítica ($> 25^\circ$), pulso cardíaco, brújula y mini-radar topográfico de $2 \times 2\text{ km}$ con ruta y POIs cercanos.
+
+
+## Pantalla de inicio interactiva
+
+La portada muestra un astronauta 3D articulado y un cohete sobre una isla circular de terreno marciano. Al pulsar una figura o «Iniciar despegue», el cohete asciende, el círculo se expande y las partículas de polvo continúan en movimiento. La música y el efecto del motor se sintetizan con Web Audio después del primer clic. «Continuar al mapa» aparece al finalizar la secuencia; «Repetir» la reinicia.
+
+Ejecutar con `npm install && npm run dev` y abrir `http://localhost:8000/?dataset=jezero_test`. `?nointro=1` abre el mapa directamente. El suelo de la portada es una representación artística y no utiliza el DEM científico del mapa.
+
+Se verificó en la versión Vite el despegue, la expansión del terreno, el botón final y el acceso al mapa. También pasaron lint, build, contratos de datos y las 37 pruebas de Node. La apariencia del astronauta es estilizada respecto de la imagen de referencia. Falta medir rendimiento en dispositivos físicos.

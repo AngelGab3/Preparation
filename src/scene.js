@@ -106,7 +106,8 @@ function createMartianAtmosphericDome() {
       opacity:       { value: 1.0 },
       horizonBias:   { value: 0.12 },
     },
-    side: THREE.BackSide,
+    // Geometry is already inverted above; render its inward-facing front side.
+    side: THREE.FrontSide,
     depthWrite: false,
     transparent: true,
     fog: false,
