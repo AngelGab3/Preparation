@@ -92,15 +92,6 @@
         <div id="hud-toast-desc" class="hud-toast-desc"></div>
         <div id="hud-toast-source" class="hud-toast-source"></div>
       </div>
-
-      <div id="hud-radio-toast" class="hud-radio-toast hidden">
-        <div class="hud-radio-header">
-          <span class="hud-radio-dot">●</span>
-          <span>🎙️ COMMS // ARES-AI [LLAMA 3]</span>
-          <span class="hud-radio-freq">CH-1 · CAPCOM [C]</span>
-        </div>
-        <div id="hud-radio-text" class="hud-radio-text"></div>
-      </div>
     </div>
 
     <div class="hud-bottom-left">
@@ -293,10 +284,10 @@
     </div>
 
     <div class="layers-header route-header copilot-title-row">
-      <span>🎙️ Copiloto ARES-AI (Llama 3)</span>
+      <span>🤖 Rover Robert &amp; ARES-AI</span>
       <div class="copilot-hdr-btns">
         <button id="copilot-voice-btn" class="copilot-mini-btn" type="button"
-          title="Activar/desactivar audio de radio">🔇 Voz</button>
+          title="Activar/desactivar audio de voz (o pulsa U)">🔇 Voz</button>
         <button id="copilot-settings-btn" class="copilot-mini-btn" type="button"
           title="Configurar API Key de Groq/Llama">⚙️ API</button>
       </div>
@@ -304,6 +295,8 @@
     <div class="copilot-chat-wrap">
       <div id="copilot-messages" class="copilot-messages"></div>
       <div class="copilot-quick-pills">
+        <button id="copilot-fact-btn" class="copilot-quick-btn" type="button"
+          data-prompt="Cuéntame un dato curioso científico sobre Marte o el Rover Perseverance">🤖 Dato curioso</button>
         <button class="copilot-quick-btn" type="button"
           data-prompt="¿Es seguro continuar la caminata en este momento?">🚨 ¿Seguro?</button>
         <button class="copilot-quick-btn" type="button"
@@ -426,6 +419,20 @@
       </div>
       <div class="dock-label">Arrastra al mapa</div>
     </div>
+  </div>
+
+  <div id="hud-radio-toast" class="hud-radio-toast hidden" role="status" aria-live="polite">
+    <div class="hud-radio-header">
+      <div class="hud-radio-title-left">
+        <span class="hud-radio-dot">●</span>
+        <span id="hud-radio-speaker">🤖 ROBERT · ROVER PERSEVERANCE</span>
+      </div>
+      <div class="hud-radio-actions">
+        <button id="hud-fact-btn" class="hud-sub-btn" type="button" title="Pedir otro dato curioso a Robert (tecla R)">💡 Dato curioso [R]</button>
+        <button id="hud-audio-btn" class="hud-sub-btn" type="button" title="Activar o silenciar bocina (tecla U)">🔇 Audio OFF [U]</button>
+      </div>
+    </div>
+    <div id="hud-radio-text" class="hud-radio-text"></div>
   </div>
 
   <div class="hint">

@@ -6,16 +6,19 @@
  */
 
 import * as THREE from 'three';
+import { state } from './state.js';
 import { sampleGroundY } from './raycast.js';
 
 const animatedRotors = [];
 const animatedMasts  = [];
 const animatedPulses = [];
+let companionRover = null;
 
 export function clearAnimatedArtifactsRegistry() {
   animatedRotors.length = 0;
   animatedMasts.length  = 0;
   animatedPulses.length = 0;
+  companionRover = null;
 }
 
 export function tickArtifactsAnimation(dt, elapsed_s) {
@@ -23,12 +26,101 @@ export function tickArtifactsAnimation(dt, elapsed_s) {
     rotor.rotation.y += dt * (rotor.userData.speed || 9.0);
   }
   for (const mast of animatedMasts) {
+    if (mast.userData.isCompanionMast && state.mode === 'fp') continue;
     const baseYaw = mast.userData.baseYaw || 0;
     mast.rotation.y = baseYaw + Math.sin(elapsed_s * 0.9 + (mast.userData.phase || 0)) * 0.45;
   }
   for (const pulse of animatedPulses) {
     const s = 1.0 + 0.14 * Math.sin(elapsed_s * 3.2 + (pulse.userData.phase || 0));
     pulse.scale.set(s, 1, s);
+  }
+
+  tickCompanionRover(dt, elapsed_s);
+}
+
+/* Hace que el Rover del asentamiento ("Robert") siga al astronauta como mascota robótica en la superficie */
+function tickCompanionRover(dt, elapsed_s) {
+  if (!companionRover || !companionRover.parent) return;
+  const ud = companionRover.userData;
+  const { cx_m, cz_m } = ud.shelterBase;
+  const cy_m = sampleGroundY(cx_m, cz_m) ?? ud.shelterBase.cy_m;
+
+  if (state.mode !== 'fp') {
+    /* En vista orbital se mantiene junto al asentamiento */
+    const wy = sampleGroundY(ud.worldX, ud.worldZ) ?? cy_m;
+    companionRover.position.set(ud.worldX - cx_m, wy - cy_m, ud.worldZ - cz_m);
+    return;
+  }
+
+  const ax = state.astronautPosition.x;
+  const az = state.astronautPosition.z;
+
+  /* Si el astronauta apareció muy lejos (> 85 m), acercar a Robert a 10 m detrás para que llegue rodando */
+  const rawDx = ax - ud.worldX;
+  const rawDz = az - ud.worldZ;
+  const rawDist = Math.hypot(rawDx, rawDz);
+  if (rawDist > 85) {
+    const ang = Math.atan2(rawDx, rawDz);
+    ud.worldX = ax - Math.sin(ang) * 10.0;
+    ud.worldZ = az - Math.cos(ang) * 10.0;
+    ud.yaw = ang;
+  }
+
+  /* Punto de acompañamiento: ~3.2 m a un costado del astronauta para verlo bien sin chocar */
+  const toRoverAng = Math.atan2(ud.worldX - ax, ud.worldZ - az);
+  const followDist = 3.2;
+  const goalX = THREE.MathUtils.clamp(ax + Math.sin(toRoverAng) * followDist, -state.boundsX, state.boundsX);
+  const goalZ = THREE.MathUtils.clamp(az + Math.cos(toRoverAng) * followDist, -state.boundsZ, state.boundsZ);
+
+  const gx = goalX - ud.worldX;
+  const gz = goalZ - ud.worldZ;
+  const gDist = Math.hypot(gx, gz);
+
+  let stepDist = 0;
+  if (gDist > 0.25) {
+    const moveYaw = Math.atan2(gx, gz);
+    const diffYaw = Math.atan2(Math.sin(moveYaw - ud.yaw), Math.cos(moveYaw - ud.yaw));
+    ud.yaw += diffYaw * Math.min(1, dt * 5.5);
+
+    const speed = Math.min(3.6, 0.85 + gDist * 0.9);
+    stepDist = Math.min(gDist, speed * dt);
+    ud.worldX += (gx / gDist) * stepDist;
+    ud.worldZ += (gz / gDist) * stepDist;
+  }
+
+  const wy = sampleGroundY(ud.worldX, ud.worldZ) ?? cy_m;
+  companionRover.position.set(ud.worldX - cx_m, wy - cy_m, ud.worldZ - cz_m);
+
+  /* Inclinación suave (pitch/roll) según la pendiente del terreno bajo las ruedas */
+  const sYaw = Math.sin(ud.yaw);
+  const cYaw = Math.cos(ud.yaw);
+  const yFront = sampleGroundY(ud.worldX + sYaw * 1.1, ud.worldZ + cYaw * 1.1) ?? wy;
+  const yBack  = sampleGroundY(ud.worldX - sYaw * 1.1, ud.worldZ - cYaw * 1.1) ?? wy;
+  const targetPitch = THREE.MathUtils.clamp(-Math.atan2(yFront - yBack, 2.2), -0.38, 0.38);
+  ud.pitch = (ud.pitch || 0) + (targetPitch - (ud.pitch || 0)) * Math.min(1, dt * 8);
+
+  companionRover.rotation.order = 'YXZ';
+  companionRover.rotation.y = ud.yaw;
+  companionRover.rotation.x = ud.pitch;
+
+  /* Girar las 6 ruedas al avanzar */
+  if (stepDist > 1e-4 && Array.isArray(ud.wheels)) {
+    const dRot = stepDist / 0.27;
+    for (const w of ud.wheels) {
+      w.rotation.x += dRot;
+    }
+  }
+
+  /* Cabezal SuperCam / Mastcam-Z mirando curiosamente al astronauta como mascota */
+  if (ud.mastHead) {
+    const lookWorldYaw = Math.atan2(ax - ud.worldX, az - ud.worldZ);
+    const relYaw = THREE.MathUtils.clamp(
+      Math.atan2(Math.sin(lookWorldYaw - ud.yaw), Math.cos(lookWorldYaw - ud.yaw)),
+      -1.35,
+      1.35
+    );
+    ud.mastHead.rotation.y += (relYaw - ud.mastHead.rotation.y) * Math.min(1, dt * 6);
+    ud.mastHead.rotation.z = Math.sin(elapsed_s * 2.4) * 0.07;
   }
 }
 
@@ -88,13 +180,18 @@ export function buildHumanScalePOIArtifactGroup(poi, poiIndex = 0, opacity = 1.0
   root.add(groundRing);
 
   if (poi.type === 'shelter') {
-    /* COMPLEJO DE ATERRIZAJE: Hábitat EVA + Rover Perseverance + Helicóptero Ingenuity */
+    /* COMPLEJO DE ATERRIZAJE: Hábitat EVA + Rover Perseverance ("Robert", compañero móvil) + Helicóptero Ingenuity */
     const habitat = createMarsHabitatMesh();
     placeOnGround(habitat, 0, 0, 0);
 
-    const perseverance = createPerseveranceRoverMesh(poiIndex);
+    const perseverance = createPerseveranceRoverMesh(poiIndex, true);
     perseverance.rotation.y = 0.45;
     placeOnGround(perseverance, 8.5, 5.0, 0);
+    perseverance.userData.shelterBase = { cx_m, cz_m, cy_m };
+    perseverance.userData.worldX = cx_m + 8.5;
+    perseverance.userData.worldZ = cz_m + 5.0;
+    perseverance.userData.yaw = 0.45;
+    companionRover = perseverance;
 
     const ingenuity = createIngenuityHelicopterMesh(poiIndex);
     ingenuity.rotation.y = -0.3;
@@ -122,9 +219,10 @@ export function buildHumanScalePOIArtifactGroup(poi, poiIndex = 0, opacity = 1.0
 /**
  * Construye un modelo 3D detallado del Rover NASA Perseverance (~3.0 m × 2.7 m × 2.2 m).
  */
-export function createPerseveranceRoverMesh(seed = 0) {
+export function createPerseveranceRoverMesh(seed = 0, isCompanion = false) {
   const rover = new THREE.Group();
-  rover.name = 'perseveranceRover';
+  rover.name = isCompanion ? 'companionRoverRobert' : 'perseveranceRover';
+  rover.userData.wheels = [];
 
   const bodyMat = new THREE.MeshStandardMaterial({ color: 0xedeae2, roughness: 0.45, metalness: 0.25 });
   const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4a238, roughness: 0.32, metalness: 0.72 });
@@ -149,6 +247,7 @@ export function createPerseveranceRoverMesh(seed = 0) {
     const wMesh = new THREE.Mesh(wheelGeo, darkMat);
     wMesh.position.set(wx, wy, wz);
     rover.add(wMesh);
+    rover.userData.wheels.push(wMesh);
 
     const hMesh = new THREE.Mesh(hubGeo, alumMat);
     hMesh.position.set(wx, wy, wz);
@@ -221,6 +320,8 @@ export function createPerseveranceRoverMesh(seed = 0) {
   mastHead.add(eyeL, eyeR);
 
   animatedMasts.push(mastHead);
+  mastHead.userData.isCompanionMast = isCompanion;
+  rover.userData.mastHead = mastHead;
   rover.add(mastHead);
 
   /* 6. Brazo robótico frontal articulado con torreta PIXL / SHERLOC y haz láser de análisis */
@@ -241,21 +342,25 @@ export function createPerseveranceRoverMesh(seed = 0) {
   turret.position.set(0, -0.62, 1.15);
   armGroup.add(turret);
 
-  /* Haz láser rojo de espectrometría apuntando a una roca objetivo frente al rover */
-  const laserBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.025, 0.35, 8), laserMat);
-  laserBeam.position.set(0, -0.78, 1.15);
-  armGroup.add(laserBeam);
+  if (!isCompanion) {
+    /* Haz láser rojo de espectrometría apuntando a una roca objetivo frente al rover estático */
+    const laserBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.025, 0.35, 8), laserMat);
+    laserBeam.position.set(0, -0.78, 1.15);
+    armGroup.add(laserBeam);
+
+    const targetRock = new THREE.Mesh(
+      new THREE.DodecahedronGeometry(0.28, 1),
+      new THREE.MeshStandardMaterial({ color: 0x7c432b, roughness: 0.92 })
+    );
+    targetRock.scale.set(1.3, 0.65, 1.1);
+    targetRock.position.set(-0.15, 0.12, 2.23);
+    rover.add(targetRock);
+  } else {
+    /* Pliegue de marcha del brazo para el Rover compañero "Robert" */
+    armGroup.rotation.x = -0.35;
+  }
 
   rover.add(armGroup);
-
-  /* Roca marciana bajo el brazo del rover */
-  const targetRock = new THREE.Mesh(
-    new THREE.DodecahedronGeometry(0.28, 1),
-    new THREE.MeshStandardMaterial({ color: 0x7c432b, roughness: 0.92 })
-  );
-  targetRock.scale.set(1.3, 0.65, 1.1);
-  targetRock.position.set(-0.15, 0.12, 2.23);
-  rover.add(targetRock);
 
   return rover;
 }

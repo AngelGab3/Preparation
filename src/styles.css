@@ -2214,22 +2214,24 @@ body.fp .controls {
   margin-top: 4px;
 }
 
-/* Toast de Transmisión de Radio en 1ª Persona (Casco EVA) */
+/* Barra inferior de subtítulos de Robert (Rover Compañero) y Copiloto ARES-AI */
 .hud-radio-toast {
-  position: absolute;
-  top: 64px;
+  position: fixed;
+  bottom: 86px;
   left: 50%;
   transform: translateX(-50%);
-  max-width: 480px;
-  width: 90%;
-  background: rgba(6, 14, 20, 0.88);
-  border: 1px solid var(--hud-cyan);
-  box-shadow: 0 0 20px rgba(102, 252, 241, 0.35);
-  border-radius: 8px;
+  max-width: 580px;
+  width: min(92vw, 580px);
+  background: rgba(8, 16, 22, 0.92);
+  border: 1px solid rgba(102, 252, 241, 0.55);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.65), 0 0 18px rgba(102, 252, 241, 0.25);
+  border-radius: 10px;
   padding: 10px 14px;
-  z-index: 100;
+  z-index: 45;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   transition: opacity 0.25s ease, transform 0.25s ease;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .hud-radio-toast.hidden {
@@ -2246,30 +2248,62 @@ body.fp .controls {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 9px;
+  font-size: 9.5px;
   font-weight: 700;
   letter-spacing: 0.08em;
   color: var(--hud-cyan);
-  margin-bottom: 5px;
-  border-bottom: 1px solid rgba(102, 252, 241, 0.2);
-  padding-bottom: 4px;
+  margin-bottom: 6px;
+  border-bottom: 1px solid rgba(102, 252, 241, 0.22);
+  padding-bottom: 5px;
+}
+
+.hud-radio-title-left {
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
 .hud-radio-dot {
-  color: #ff3855;
+  color: #55f29b;
   animation: pulse 1s infinite alternate;
 }
 
-.hud-radio-freq {
-  color: var(--muted);
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+.hud-radio-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.hud-sub-btn {
+  font-family: inherit;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 2.5px 7px;
+  border-radius: 5px;
+  border: 1px solid rgba(102, 252, 241, 0.35);
+  background: rgba(102, 252, 241, 0.08);
+  color: var(--hud-cyan);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.hud-sub-btn:hover {
+  background: var(--hud-cyan);
+  color: #081216;
+}
+
+.hud-sub-btn.active {
+  background: rgba(85, 242, 155, 0.18);
+  border-color: #55f29b;
+  color: #55f29b;
 }
 
 .hud-radio-text {
-  font-size: 11px;
-  line-height: 1.45;
-  color: #f0f7ff;
-  letter-spacing: 0.02em;
+  font-size: 11.5px;
+  line-height: 1.48;
+  color: #f4f9ff;
+  letter-spacing: 0.015em;
 }
 
 /* ============ Fase G1: Group Status HUD ============ */
