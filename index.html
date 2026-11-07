@@ -19,6 +19,15 @@
 
   <!-- HUD compacto en vista orbital + Visor Sci-Fi completo en 1ª persona (estilo HUD_IDEA.jpeg) -->
   <div id="eva-hud" class="eva-hud" aria-label="Telemetría EVA (HUD)">
+    <div class="helmet-shell" aria-hidden="true">
+      <div class="helmet-shell-rim"></div>
+      <div class="helmet-shell-brow"></div>
+      <div class="helmet-shell-chin"></div>
+      <div class="helmet-shell-glass"></div>
+      <span class="helmet-shell-latch helmet-shell-latch-left"></span>
+      <span class="helmet-shell-latch helmet-shell-latch-right"></span>
+      <span class="helmet-shell-label">EVA // VISOR PRESURIZADO · WASD MOVER · E ANALIZAR · V VISTA · ESC SALIR</span>
+    </div>
     <div class="hud-top-left">
       <div class="hud-tag">// EVA_STATUS · PLSS</div>
       <div id="hud-slope-alert" class="hud-malfunction-box" role="alert" aria-live="polite" hidden>
@@ -465,6 +474,7 @@
       <p id="signal-hint" role="status">PULSA UNA FIGURA PARA INICIAR</p>
       <button id="signal-start" type="button">COMENZAR VIAJE <span>↗</span></button>
       <button id="signal-continue" type="button" hidden>IR AL MAPA PRINCIPAL <span>↗</span></button>
+      <button id="signal-skip" type="button">SALTAR INTRODUCCIÓN <span>↗</span></button>
       <button id="signal-replay" type="button">↺ REPETIR VIAJE</button>
     </div>
     <div class="signal-visor" aria-hidden="true"><div class="signal-visor-cross">+</div><span>EVA // SUPERFICIE MARCIANA</span></div>

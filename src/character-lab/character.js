@@ -49,7 +49,8 @@ export function createExplorer() {
  }
  const pelvis=new T.Group();pelvis.position.y=1.02;root.add(pelvis);
  fabric(pelvis,[[0,.20,.13],[.35,.235,.145],[1,.19,.125]],.20,white,1,.002);
- const body=new T.Group();body.position.y=1.17;root.add(body);
+ const waist=new T.Group();waist.position.y=1.06;root.add(waist);
+ const body=new T.Group();body.position.y=.11;waist.add(body);
  fabric(body,[[0,.19,.12],[.3,.205,.135],[.7,.25,.15],[.88,.24,.135],[1,.14,.105]],.40,white,1,.002);
  box(body,dark,[0,.17,-.202],[.40,.53,.19],.025);
  box(body,shell,[0,.17,-.231],[.375,.49,.17],.025);
@@ -187,7 +188,7 @@ export function createExplorer() {
 
   return { group: handGroup, fingers: fingerData,
            thumb: { meta: thumbMeta, prox: thumbProx, dist: thumbDist },
-           side };
+           idleCurls: [0,0,0,0], side };
  }
 
  // ── setFingers: drive all phalanges from a single curl [0=open, 1=fist] ──────
@@ -249,20 +250,25 @@ export function createExplorer() {
   box(knee,dark,[0,-.025,.082],[.119,.13,.028],.025);
   box(knee,shell,[0,-.026,.102],[.102,.105,.016],.022);
   const foot=new T.Group();foot.position.set(0,-.40,0);knee.add(foot);
-  box(foot,rubber,[0,-.055,.053],[.162,.071,.29],.019);
-  box(foot,white,[0,-.011,.055],[.153,.095,.264],.027);
-  box(foot,dark,[0,-.008,.17],[.15,.052,.048],.013);
-  for(let j=0;j<3;j++)box(foot,metal,[0,.035,.02+j*.042],[.13,.012,.018],.003);
-  for(let j=0;j<7;j++)box(foot,rubber,[0,-.093,-.055+j*.035],[.163,.013,.016],.002);
+  box(foot,rubber,[0,-.055,-.025],[.162,.071,.20],.019);
+  box(foot,white,[0,-.011,-.025],[.153,.095,.20],.027);
+  const toe=new T.Group();toe.position.z=.075;foot.add(toe);
+  box(toe,rubber,[0,-.055,.065],[.162,.071,.15],.019);
+  box(toe,white,[0,-.011,.065],[.153,.095,.15],.027);
+  box(toe,dark,[0,-.008,.11],[.15,.052,.048],.013);
+  for(let j=0;j<3;j++){const z=.02+j*.042;if(z<.075)box(foot,metal,[0,.035,z],[.13,.012,.018],.003);else box(toe,metal,[0,.035,z-.075],[.13,.012,.018],.003);}
+  for(let j=0;j<7;j++){const z=-.055+j*.035;if(z<.075)box(foot,rubber,[0,-.093,z],[.163,.013,.016],.002);else box(toe,rubber,[0,-.093,z-.075],[.163,.013,.016],.002);}
   torus(knee,[0,-.34,0],.071,.008,dark,Math.PI/2);
-  legs.push({thigh,knee,foot,side:s});
+  legs.push({thigh,knee,foot,toe,side:s});
  }
 
- const joints={head,body,pelvis,arms,legs};
+ const joints={head,body,waist,pelvis,arms,legs};
 
- function pose(time, mode) {
+ function pose(time, mode, walkWeight = 1, runWeight = 0, turnWeight = 0, airWeight = 0) {
   root.position.set(0,-.09,0);
-  body.position.y = 1.17 + Math.sin(time*1.9)*.0025;
+  waist.rotation.set(0,0,0);
+  pelvis.rotation.set(0,0,0);
+  body.position.y = .11 + Math.sin(time*1.9)*.0025;
   body.rotation.set(0,0,0);
   head.rotation.set(0, Math.sin(time*.6)*.08, 0);
 
@@ -276,11 +282,11 @@ export function createExplorer() {
    const idleCurl   = .12 + Math.sin(phase)       * .025;
    const idleSpread = .012 + Math.abs(Math.sin(time*.45 + side)) * .010;
    // Per-finger micro-delay for a natural "breathing" look
-   const indiv = [0,1,2,3].map(f =>
-     T.MathUtils.clamp(idleCurl + Math.sin(phase + f*.7)*.018, .04, .35));
+   const indiv = handData.idleCurls;
+   for(let f=0;f<4;f++)indiv[f]=T.MathUtils.clamp(idleCurl+Math.sin(phase+f*.7)*.018,.04,.35);
    setFingers(handData, idleCurl, idleSpread, indiv);
   }
-  for (const {thigh,knee,foot} of legs){thigh.rotation.set(0,0,0);knee.rotation.set(0,0,0);foot.rotation.set(0,0,0);}
+  for (const {thigh,knee,foot,toe} of legs){thigh.rotation.set(0,0,0);knee.rotation.set(0,0,0);foot.rotation.set(0,0,0);toe.rotation.set(0,0,0);}
 
   if (mode === 'scan') {
    const p = Math.sin(Math.min(time/5, 1)*Math.PI);
@@ -329,6 +335,90 @@ export function createExplorer() {
     setFingers(handData, walkCurl, .007);
    });
    head.rotation.y = 0;
+   if (walkWeight < 1) {
+    const w=T.MathUtils.clamp(walkWeight,0,1);
+    root.position.y=T.MathUtils.lerp(-.09,root.position.y,w);
+    root.position.z*=w;
+    body.rotation.z*=w;
+    for (const {thigh,knee,foot} of legs) {
+     thigh.rotation.x*=w;knee.rotation.x*=w;foot.rotation.x*=w;
+    }
+    for (const {shoulder,elbow,wrist} of arms) {
+     shoulder.rotation.x*=w;
+     elbow.rotation.x=T.MathUtils.lerp(-.15,elbow.rotation.x,w);
+     wrist.rotation.x*=w;
+    }
+   }
+
+  } else if (mode === 'locomotion') {
+   // Gait cíclico: cada pie despega y apoya en oposición; el tronco amortigua el paso.
+   const w=T.MathUtils.clamp(walkWeight,0,1),run=T.MathUtils.clamp(runWeight,0,1);
+   const turn=T.MathUtils.clamp(turnWeight,-1,1),air=T.MathUtils.clamp(airWeight,0,1);
+   const cycle=time/3.6*Math.PI*2,step=Math.sin(cycle),sideSway=Math.cos(cycle);
+   const stride=(.39+.13*run)*w;
+   root.position.y=-.09+Math.abs(step)*(.024+.014*run)*w;
+   waist.rotation.x=(.025+.018*run)*w;
+   waist.rotation.y=.052*step*w+turn*.045;
+   waist.rotation.z=.026*sideSway*w+turn*.05;
+   pelvis.rotation.y=-.055*step*w;
+   pelvis.rotation.z=-.024*sideSway*w;
+   body.rotation.x=(.015+.025*run)*w;
+   body.rotation.z=-.012*sideSway*w-turn*.018;
+   head.rotation.x=-(.012+.018*run)*w;
+   head.rotation.y=-waist.rotation.y*.55+Math.sin(time*.35)*.018;
+
+   for(const {thigh,knee,foot,toe,side} of legs){
+    const phase=cycle+(side===-1?0:Math.PI);
+    const swing=Math.sin(phase),roll=Math.cos(phase);
+    thigh.rotation.x=-stride*swing+.045*run*w;
+    thigh.rotation.y=side*.025*swing*w;
+    thigh.rotation.z=side*(.027+.018*roll)*w;
+    knee.rotation.x=(.09+.58*Math.max(0,-swing))*(1+.16*run)*w;
+    knee.rotation.z=-side*.012*w;
+    foot.rotation.x=-thigh.rotation.x*.34-knee.rotation.x*.48+.065*roll*w;
+    foot.rotation.z=-thigh.rotation.z*.45;
+    toe.rotation.x=-.22*Math.max(0,roll)*w;
+   }
+   for(const {shoulder,elbow,wrist,handData,side} of arms){
+    const swing=Math.sin(cycle+(side===-1?0:Math.PI));
+    shoulder.rotation.x=-side*(.27+.07*run)*step*w;
+    shoulder.rotation.y=side*(.025+.018*sideSway)*w;
+    shoulder.rotation.z=side*(.12+.035*sideSway*w);
+    elbow.rotation.x=-.15-(.10+.13*Math.max(0,-swing))*w;
+    wrist.rotation.x=-shoulder.rotation.x*.20+.025*sideSway*w;
+    wrist.rotation.y=side*.045*step*w;
+    const curl=.12+(.08+.055*Math.max(0,swing))*w;
+    const curls=handData.idleCurls;
+    for(let f=0;f<4;f++)curls[f]=curl+.018*Math.sin(cycle+f*.55+side);
+    setFingers(handData,curl,.012,curls);
+   }
+   if(air>0){
+    root.position.y+=.035*air;
+    waist.rotation.x=T.MathUtils.lerp(waist.rotation.x,.06,air);
+    for(const {thigh,knee,foot,toe,side} of legs){
+     thigh.rotation.x=T.MathUtils.lerp(thigh.rotation.x,side*.18,air);
+     knee.rotation.x=T.MathUtils.lerp(knee.rotation.x,.46,air);
+     foot.rotation.x=T.MathUtils.lerp(foot.rotation.x,-.19,air);
+     toe.rotation.x=T.MathUtils.lerp(toe.rotation.x,-.10,air);
+    }
+    for(const {shoulder,elbow,wrist,side} of arms){
+     shoulder.rotation.x=T.MathUtils.lerp(shoulder.rotation.x,-.34,air);
+     shoulder.rotation.z+=side*.12*air;
+     elbow.rotation.x=T.MathUtils.lerp(elbow.rotation.x,-.36,air);
+     wrist.rotation.x+=.08*air;
+    }
+   }
+
+  } else if (mode === 'idle') {
+   waist.rotation.x=Math.sin(time*1.8)*.004;
+   waist.rotation.z=Math.sin(time*.72)*.006;
+   pelvis.rotation.y=Math.sin(time*.55)*.005;
+   head.rotation.x=Math.sin(time*.88)*.012;
+   for(const {shoulder,elbow,wrist,side} of arms){
+    shoulder.rotation.x=Math.sin(time*.88+side)*.018;
+    elbow.rotation.x=-.15+Math.sin(time*.73+side)*.012;
+    wrist.rotation.x=Math.sin(time*.95-side)*.012;
+   }
 
   } else if (mode === 'turn') {
    head.rotation.y = Math.sin(Math.min(time/4,1)*Math.PI)*.6;

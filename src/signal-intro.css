@@ -17,9 +17,11 @@ body.intro-playing > :not(#intro-cinematic):not(script):not(style){visibility:hi
 #signal-start,#signal-continue{background:#ffad77;color:#261b25;padding:19px 24px;font-weight:bold;box-shadow:0 8px 32px #1b121c88}
 #signal-start:hover,#signal-continue:hover{background:#ffe0b5}
 #signal-start span,#signal-continue span{font-size:18px;margin-left:30px}
-#signal-replay{background:#2d212d99;border:1px solid #ac796d;padding:19px 21px}
+#signal-skip,#signal-replay{background:#2d212dcb;border:1px solid #d4a38b;padding:19px 21px}
+#signal-skip:hover,#signal-replay:hover{background:#584049;border-color:#ffe0b5}
+#signal-skip span{font-size:16px;margin-left:12px}
 .signal-side{position:absolute;right:48px;bottom:60px;z-index:2;font:10px Consolas,monospace;letter-spacing:.2em;color:#ffc799}.signal-side span{margin:0 12px}
-@media(max-width:760px){.signal-top{top:22px;left:20px;right:20px}.signal-brand{font-size:14px}.signal-brand span{font-size:8px}.signal-heading{top:19%;left:20px;max-width:260px}.signal-heading h1{font-size:clamp(32px,7vw,42px);line-height:.94}.signal-heading p{font-size:12px;max-width:225px}.signal-actions{left:20px;right:20px;bottom:22px}.signal-actions p{line-height:1.6}.signal-side{display:none}#signal-start,#signal-continue{padding:16px}#signal-replay{padding:16px}}
+@media(max-width:760px){.signal-top{top:22px;left:20px;right:20px}.signal-brand{font-size:14px}.signal-brand span{font-size:8px}.signal-heading{top:19%;left:20px;max-width:260px}.signal-heading h1{font-size:clamp(32px,7vw,42px);line-height:.94}.signal-heading p{font-size:12px;max-width:225px}.signal-actions{left:20px;right:20px;bottom:22px}.signal-actions p{line-height:1.6}.signal-side{display:none}#signal-start,#signal-continue{padding:16px}#signal-skip,#signal-replay{padding:16px}}
 
 .signal-heading{max-width:min(420px,40vw)}
 .signal-heading h1{font-size:clamp(42px,5vw,78px);line-height:.94;max-width:520px}

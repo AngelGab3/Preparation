@@ -4,73 +4,26 @@ import * as THREE from 'three';
 import { scene, renderer } from './scene.js';
 import { state } from './state.js';
 import { sampleGroundY, raycastAstronaut, raycastTerrain } from './raycast.js';
+import { createExplorer } from './character-lab/character.js';
 
 const dockEl    = document.getElementById('astronaut-dock');
 const dockLabel = dockEl.querySelector('.dock-label');
 
 /* ----------------------------------------------------------------- mesh */
-let walkPhase = 0;
+let gaitTime = 0;
+let idleTime = 0;
+let gaitWeight = 0;
+let runWeight = 0;
+let airWeight = 0;
+let turnBank = 0;
+const characters = new WeakMap();
+const visualTarget = new THREE.Vector3();
 
 function createAstronautMesh() {
   const g = new THREE.Group();
-
-  const whiteMat  = new THREE.MeshStandardMaterial({ color: 0xf2f2f2, roughness: 0.45, metalness: 0.1 });
-  const darkMat   = new THREE.MeshStandardMaterial({ color: 0x2a3542, roughness: 0.25, metalness: 0.85 });
-  const accentMat = new THREE.MeshStandardMaterial({
-    color: 0xff6a3d, emissive: 0xff6a3d, emissiveIntensity: 0.7,
-    roughness: 0.15, metalness: 0.9
-  });
-
-  const suit = new THREE.Group();
-  suit.name = 'suitBody';
-
-  const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.32, 0.72, 6, 12), whiteMat);
-  body.position.y = 1.12;
-  suit.add(body);
-
-  const helmet = new THREE.Mesh(new THREE.SphereGeometry(0.42, 16, 16), darkMat);
-  helmet.position.y = 1.9;
-  suit.add(helmet);
-
-  const visor = new THREE.Mesh(
-    new THREE.SphereGeometry(0.31, 16, 16, 0, Math.PI, Math.PI * 0.35, Math.PI * 0.65),
-    accentMat
-  );
-  visor.position.set(0, 1.9, 0.17);
-  visor.rotation.y = Math.PI / 2;
-  suit.add(visor);
-
-  const pack = new THREE.Mesh(new THREE.BoxGeometry(0.58, 0.78, 0.34), whiteMat);
-  pack.position.set(0, 1.15, -0.36);
-  suit.add(pack);
-
-  const packAccent = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.12, 0.06), accentMat);
-  packAccent.position.set(0, 1.38, -0.54);
-  suit.add(packAccent);
-
-  /* Extremidades articuladas para vista en 3ª persona */
-  const leftLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.48, 4, 8), whiteMat);
-  leftLeg.position.set(-0.17, 0.42, 0);
-  leftLeg.name = 'leftLeg';
-  suit.add(leftLeg);
-
-  const rightLeg = new THREE.Mesh(new THREE.CapsuleGeometry(0.13, 0.48, 4, 8), whiteMat);
-  rightLeg.position.set(0.17, 0.42, 0);
-  rightLeg.name = 'rightLeg';
-  suit.add(rightLeg);
-
-  const leftArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.44, 4, 8), whiteMat);
-  leftArm.position.set(-0.44, 1.12, 0);
-  leftArm.name = 'leftArm';
-  suit.add(leftArm);
-
-  const rightArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.11, 0.44, 4, 8), whiteMat);
-  rightArm.position.set(0.44, 1.12, 0);
-  rightArm.name = 'rightArm';
-  suit.add(rightArm);
-
-  g.add(suit);
-
+  const character = createExplorer();
+  characters.set(g, character);
+  g.add(character.root);
   /* Marcadores orbitales (visibles solo en vista orbital) */
   const orbitalMarkers = new THREE.Group();
   orbitalMarkers.name = 'orbitalMarkers';
@@ -109,66 +62,44 @@ function createAstronautMesh() {
 
 /* Actualiza escala, pose y orientación del astronauta en 3ª persona (1 unidad = 1 metro) */
 export function updateAstronautThirdPersonVisuals({
-  visible,
-  x,
-  y,
-  z,
-  yawRad,
-  walkSpeed = 0,
-  dt = 0.016,
-  isGrounded = true,
+  visible, x, y, z, yawRad, walkSpeed = 0, dt = 0.016, isGrounded = true,
 }) {
   const g = state.astronautGroup;
   if (!g) return;
+  const character = characters.get(g);
+  if (!character) return;
 
-  g.position.set(x, y, z);
-
-  if (!visible) {
-    g.visible = false;
-    return;
-  }
-
-  g.visible = true;
-  /* Escala métrica real (~1.75 m de altura total) */
-  g.scale.setScalar(0.85);
-
+  // Mantener el ciclo del cuerpo activo bajo el visor evita saltos al volver a tercera persona.
+  g.visible = visible;
+  g.scale.setScalar(0.95);
   const markers = g.getObjectByName('orbitalMarkers');
   if (markers) markers.visible = false;
 
-  /* Rotación horizontal suave hacia la dirección de avance/mirada */
-  const curYaw = g.rotation.y;
-  const diff = Math.atan2(Math.sin(yawRad - curYaw), Math.cos(yawRad - curYaw));
-  g.rotation.y = curYaw + diff * Math.min(1, dt * 12);
+  const turn = 1 - Math.exp(-9 * dt);
+  const diff = Math.atan2(Math.sin(yawRad - g.rotation.y), Math.cos(yawRad - g.rotation.y));
+  const yawStep = diff * turn;
+  g.rotation.y += yawStep;
+  visualTarget.set(x, y, z);
+  g.position.lerp(visualTarget, 1 - Math.exp(-18 * dt));
 
-  /* Animación de marcha en 3ª persona */
-  const suit = g.getObjectByName('suitBody');
-  if (!suit) return;
-  const lLeg = suit.getObjectByName('leftLeg');
-  const rLeg = suit.getObjectByName('rightLeg');
-  const lArm = suit.getObjectByName('leftArm');
-  const rArm = suit.getObjectByName('rightArm');
-
-  if (!isGrounded) {
-    suit.position.y = 0.05;
-    if (lLeg) lLeg.rotation.x = 0.35;
-    if (rLeg) rLeg.rotation.x = -0.25;
-    if (lArm) lArm.rotation.x = -0.45;
-    if (rArm) rArm.rotation.x = 0.35;
-  } else if (walkSpeed > 0.05) {
-    walkPhase += dt * (4.0 + walkSpeed * 2.4);
-    const swing = Math.sin(walkPhase) * Math.min(0.65, 0.25 + walkSpeed * 0.14);
-    suit.position.y = Math.abs(Math.sin(walkPhase)) * 0.045;
-    if (lLeg) lLeg.rotation.x = swing;
-    if (rLeg) rLeg.rotation.x = -swing;
-    if (lArm) lArm.rotation.x = -swing * 0.8;
-    if (rArm) rArm.rotation.x = swing * 0.8;
+  const walkSpeedMs = Math.max(.1, state.fisio.walk_speed_ms || 1.2);
+  const runSpeedMs = Math.max(walkSpeedMs + .1, state.fisio.run_speed_ms || 2.5);
+  const targetWeight = Math.min(1, walkSpeed / walkSpeedMs);
+  gaitWeight += (targetWeight - gaitWeight) * (1 - Math.exp(-7 * dt));
+  const targetRun = THREE.MathUtils.clamp((walkSpeed - walkSpeedMs) / (runSpeedMs - walkSpeedMs), 0, 1);
+  runWeight += (targetRun - runWeight) * (1 - Math.exp(-5 * dt));
+  airWeight += ((isGrounded ? 0 : 1) - airWeight) * (1 - Math.exp(-11 * dt));
+  const turnSpeed = dt > 0 ? yawStep / dt : 0;
+  const targetBank = THREE.MathUtils.clamp(turnSpeed / 2, -1, 1) * gaitWeight;
+  turnBank += (targetBank - turnBank) * (1 - Math.exp(-8 * dt));
+  if (walkSpeed > .02 && isGrounded) {
+    gaitTime = (gaitTime + dt * 3.6 * Math.min(2.2, walkSpeed / walkSpeedMs)) % 3.6;
+  }
+  idleTime += dt;
+  if (gaitWeight < .01 && airWeight < .01) {
+    character.pose(idleTime, 'idle');
   } else {
-    suit.position.y = 0;
-    const damp = Math.max(0, 1 - dt * 10);
-    if (lLeg) lLeg.rotation.x *= damp;
-    if (rLeg) rLeg.rotation.x *= damp;
-    if (lArm) lArm.rotation.x *= damp;
-    if (rArm) rArm.rotation.x *= damp;
+    character.pose(gaitTime, 'locomotion', gaitWeight, runWeight, turnBank, airWeight);
   }
 }
 
@@ -176,20 +107,14 @@ export function updateAstronautThirdPersonVisuals({
 export function restoreAstronautOrbitalVisuals() {
   const g = state.astronautGroup;
   if (!g) return;
-  const dim_m = Math.max(state.terrainWidth, state.terrainDepth);
+  gaitWeight = 0; runWeight = 0; airWeight = 0; turnBank = 0;
   g.visible = true;
-  g.scale.setScalar(dim_m * 0.0125);
+  g.position.copy(state.astronautPosition);
+  g.scale.setScalar(Math.max(state.terrainWidth, state.terrainDepth) * 0.0125);
   g.rotation.set(0, 0, 0);
   const markers = g.getObjectByName('orbitalMarkers');
   if (markers) markers.visible = true;
-  const suit = g.getObjectByName('suitBody');
-  if (suit) {
-    suit.position.y = 0;
-    ['leftLeg', 'rightLeg', 'leftArm', 'rightArm'].forEach((n) => {
-      const part = suit.getObjectByName(n);
-      if (part) part.rotation.set(0, 0, 0);
-    });
-  }
+  characters.get(g)?.pose(0, 'idle');
 }
 
 /* --------------------------------------------------------------- spawn */
@@ -220,14 +145,20 @@ export function recallAstronaut() {
   if (!state.astronautGroup) return;
 
   scene.remove(state.astronautGroup);
+  const textures = new Set();
   state.astronautGroup.traverse((obj) => {
     if (obj.geometry) obj.geometry.dispose();
     if (obj.material) {
-      if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-      else obj.material.dispose();
+      for (const material of [].concat(obj.material)) {
+        for (const value of Object.values(material)) if (value?.isTexture) textures.add(value);
+        material.dispose();
+      }
     }
   });
+  textures.forEach((texture) => texture.dispose());
+  characters.delete(state.astronautGroup);
   state.astronautGroup = null;
+  gaitTime = 0; idleTime = 0; gaitWeight = 0; runWeight = 0; airWeight = 0; turnBank = 0;
 
   dockEl.classList.remove('placed');
   dockEl.title = 'Arrastra el astronauta al mapa';
