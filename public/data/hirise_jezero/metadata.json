@@ -1,0 +1,33 @@
+{
+  "dataset_id": "hirise_jezero",
+  "label": "Jezero HiRISE 1 m/px (ventana 2 km)",
+  "source": "HiRISE",
+  "crs": "IAU_2015:49900",
+  "size_m": [
+    2019.33,
+    2019.33
+  ],
+  "resolution_m": 1.0096633,
+  "shape": [
+    2000,
+    2000
+  ],
+  "elevation_range_m": [
+    -2559.96,
+    -2437.43
+  ],
+  "heightmap": {
+    "file": "heightmap.f32",
+    "format": "float32-le",
+    "units": "m"
+  },
+  "layers": [
+    {
+      "id": "base",
+      "file": "texture.png",
+      "type": "base"
+    }
+  ],
+  "acquisition_date": "2016-12",
+  "uncertainty_note": "HiRISE DTEEC_045994_1985_046060_1985_U01 (USGS/UA), 1 m/px. Textura = hillshade + tinte hipsométrico."
+}

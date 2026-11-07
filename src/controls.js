@@ -10,13 +10,14 @@ import { state } from './state.js';
 import { CONFIG } from './config.js';
 import { sampleGroundY, sampleDemHeightRelM, sampleSlopeDeg, getSlopeCostFactor } from './raycast.js';
 import { applyHeights, enableLocalPatch, updateLocalPatchIfNeeded, disableLocalPatch, toggleDustStormSimulation, computeEmergencyEvacuationRoute, applyRouteToScene } from './terrain.js';
-import { spawnAstronaut } from './astronaut.js';
+import { spawnAstronaut, updateAstronautThirdPersonVisuals, restoreAstronautOrbitalVisuals } from './astronaut.js';
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
 import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio } from './copilot.js';
 /* === G1 === */
 import { advanceGroupState, aggregateGroupState, createSoloHealth } from './health_group.js';
 import { computeHealthAwareRoute, compareRoutes, PRESETS } from './health_route_astar.js';
 const modeBtn = document.getElementById('mode-btn');
+const viewToggleBtn = document.getElementById('view-toggle-btn');
 const hintEl = document.querySelector('.hint');
 const hSlider = document.getElementById('h-slider');
 const hValue = document.getElementById('h-value');
@@ -58,11 +59,19 @@ const hudToastDescEl = document.getElementById('hud-toast-desc');
 const hudToastSourceEl = document.getElementById('hud-toast-source');
 let toastTimeoutId = null;
 
-/* Estado interno del salto y misión */
+/* Estado interno del salto, cámara 1ª/3ª persona y misión */
 let vy = 0;
 let isGrounded = true;
 let evaElapsed_s = 0;
 let minimapFrameCounter = 0;
+let tpBlend = 0; // 0 = 1ª persona, 1 = 3ª persona (interpolado suavemente)
+let playerYaw = 0;
+const playerPos = new THREE.Vector3();
+
+export function togglePerspectiveView() {
+  state.fpThirdPerson = !state.fpThirdPerson;
+  updateUI();
+}
 
 /* Temporales */
 const _fwd = new THREE.Vector3();
@@ -107,6 +116,15 @@ export function initControls() {
     if (state.mode === 'fp') leaveFirstPerson();
     else enterFirstPerson();
   });
+
+  if (viewToggleBtn) {
+    viewToggleBtn.addEventListener('click', () => {
+      togglePerspectiveView();
+      if (state.mode === 'fp' && !state.fpControls.isLocked) {
+        state.fpControls.lock();
+      }
+    });
+  }
 
   /* Slider */
   hSlider.addEventListener('input', () => {
@@ -153,6 +171,10 @@ export function initControls() {
       if (e.code === 'KeyC' && !e.repeat) {
         e.preventDefault();
         triggerCopilotRadioComms();
+      }
+      if (e.code === 'KeyV' && !e.repeat) {
+        e.preventDefault();
+        togglePerspectiveView();
       }
       /* === G2 === */
       if (e.code === 'KeyM' && !e.repeat) {
@@ -253,7 +275,14 @@ export function enterFirstPerson(lookTarget = null) {
   const targetGroundY = sampleGroundY(targetX, targetZ) ?? (groundY ?? 0);
   camera.lookAt(targetX, targetGroundY + 1.4, targetZ);
 
-  if (state.astronautGroup) state.astronautGroup.visible = false;
+  playerPos.copy(camera.position);
+  tpBlend = state.fpThirdPerson ? 1 : 0;
+  camera.getWorldDirection(_fwd);
+  playerYaw = Math.atan2(_fwd.x, _fwd.z);
+  if (state.astronautGroup) {
+    state.astronautGroup.rotation.y = playerYaw;
+    state.astronautGroup.visible = Boolean(state.fpThirdPerson);
+  }
 
   updateUI();
   state.fpControls.lock();
@@ -269,7 +298,7 @@ export function leaveFirstPerson() {
   camera.up.set(0, 0, -1);
 
   const target = state.astronautGroup
-    ? state.astronautGroup.position.clone()
+    ? state.astronautPosition.clone()
     : new THREE.Vector3(0, 0, 0);
   target.y = 0;
 
@@ -287,7 +316,7 @@ export function leaveFirstPerson() {
   };
   state.orbitControls.enabled = false;
 
-  if (state.astronautGroup) state.astronautGroup.visible = true;
+  restoreAstronautOrbitalVisuals();
   updateUI();
 }
 
@@ -307,8 +336,8 @@ export function updateControls(dt) {
 }
 
 function updateFirstPerson(dt) {
-  const prevX_m = camera.position.x;
-  const prevZ_m = camera.position.z;
+  const prevX_m = playerPos.x;
+  const prevZ_m = playerPos.z;
   const prevElev_m = sampleDemHeightRelM(prevX_m, prevZ_m) ?? 0;
 
   /* --- Salto (m/s y m/s²) --- */
@@ -343,51 +372,53 @@ function updateFirstPerson(dt) {
 
   if (_move.lengthSq() > 0 && speed_ms > 0) {
     _move.normalize().multiplyScalar(speed_ms * dt);
-    camera.position.x += _move.x;
-    camera.position.z += _move.z;
+    playerPos.x += _move.x;
+    playerPos.z += _move.z;
+    playerYaw = Math.atan2(_move.x, _move.z);
+  } else {
+    playerYaw = Math.atan2(_fwd.x, _fwd.z);
   }
 
   /* --- Bounds --- */
-  camera.position.x = THREE.MathUtils.clamp(camera.position.x, -state.boundsX, state.boundsX);
-  camera.position.z = THREE.MathUtils.clamp(camera.position.z, -state.boundsZ, state.boundsZ);
+  playerPos.x = THREE.MathUtils.clamp(playerPos.x, -state.boundsX, state.boundsX);
+  playerPos.z = THREE.MathUtils.clamp(playerPos.z, -state.boundsZ, state.boundsZ);
 
   /* --- Actualizar parche local si el jugador se aleja del centro (T5) --- */
-  updateLocalPatchIfNeeded(camera.position.x, camera.position.z);
+  updateLocalPatchIfNeeded(playerPos.x, playerPos.z);
 
   /* --- Física vertical (en metros) --- */
-  const groundY = sampleGroundY(camera.position.x, camera.position.z);
+  const groundY = sampleGroundY(playerPos.x, playerPos.z);
   if (groundY !== null) {
     const targetY = groundY + state.fisio.eye_height_m;
 
     if (isGrounded) {
-      const dy = targetY - camera.position.y;
+      const dy = targetY - playerPos.y;
       if (dy < -CONFIG.FALL_THRESHOLD_M) {
         isGrounded = false;
         vy = 0;
       } else {
         const k = 1 - Math.exp(-CONFIG.WALK_Y_SMOOTHING * dt);
-        camera.position.y += dy * k;
+        playerPos.y += dy * k;
       }
     }
 
     if (!isGrounded) {
       vy -= state.fisio.gravity_ms2 * dt;
-      camera.position.y += vy * dt;
+      playerPos.y += vy * dt;
 
-      if (camera.position.y <= targetY) {
-        camera.position.y = targetY;
+      if (playerPos.y <= targetY) {
+        playerPos.y = targetY;
         vy = 0;
         isGrounded = true;
       }
     }
 
-    state.astronautPosition.set(camera.position.x, groundY, camera.position.z);
-    if (state.astronautGroup) state.astronautGroup.position.copy(state.astronautPosition);
+    state.astronautPosition.set(playerPos.x, groundY, playerPos.z);
   }
 
-  /* --- Telemetría y consumo de oxígeno en 1ª persona (T7) --- */
-  const curX_m = camera.position.x;
-  const curZ_m = camera.position.z;
+  /* --- Telemetría y consumo de oxígeno en 1ª/3ª persona (T7) --- */
+  const curX_m = playerPos.x;
+  const curZ_m = playerPos.z;
   const curElev_m = sampleDemHeightRelM(curX_m, curZ_m) ?? 0;
   const minElev_m = state.metadata ? state.metadata.elevation_range_m[0] : 0;
 
@@ -395,6 +426,47 @@ function updateFirstPerson(dt) {
   const actualSpeed = dt > 1e-5 ? stepDist_m / dt : 0;
   const deltaElev_m = curElev_m - prevElev_m;
   const slope_deg = sampleSlopeDeg(curX_m, curZ_m);
+
+  /* --- Cámara en 1ª / 3ª persona (transición suave con tpBlend) --- */
+  const targetBlend = state.fpThirdPerson ? 1 : 0;
+  tpBlend += (targetBlend - tpBlend) * Math.min(1, dt * 10);
+  if (Math.abs(targetBlend - tpBlend) < 0.002) tpBlend = targetBlend;
+
+  const footY = playerPos.y - state.fisio.eye_height_m;
+  updateAstronautThirdPersonVisuals({
+    visible: tpBlend > 0.08,
+    x: playerPos.x,
+    y: footY,
+    z: playerPos.z,
+    yawRad: playerYaw,
+    walkSpeed: actualSpeed,
+    dt,
+    isGrounded,
+  });
+
+  if (tpBlend <= 0.001) {
+    camera.position.copy(playerPos);
+  } else {
+    camera.getWorldDirection(_lookDir);
+    const dist = 3.8 * tpBlend;
+    const shoulder = 0.28 * tpBlend;
+    const camX = THREE.MathUtils.clamp(
+      playerPos.x - _lookDir.x * dist + _right.x * shoulder,
+      -state.boundsX,
+      state.boundsX
+    );
+    const camZ = THREE.MathUtils.clamp(
+      playerPos.z - _lookDir.z * dist + _right.z * shoulder,
+      -state.boundsZ,
+      state.boundsZ
+    );
+    let camY = playerPos.y + 0.45 * tpBlend - _lookDir.y * dist;
+    const camGroundY = sampleGroundY(camX, camZ);
+    if (camGroundY !== null) {
+      camY = Math.max(camY, camGroundY + 0.55);
+    }
+    camera.position.set(camX, camY, camZ);
+  }
 
   const isMoving = stepDist_m > 1e-4;
   const baseRate_l_h = state.fisio.o2_base_consumption_l_per_h;
@@ -623,8 +695,8 @@ function updateProximityScienceHUD() {
     return;
   }
 
-  const px = camera.position.x;
-  const pz = camera.position.z;
+  const px = state.astronautPosition.x;
+  const pz = state.astronautPosition.z;
   let closest = null;
   let minDist = 28.0;
 
@@ -845,9 +917,15 @@ function updateTransition(dt) {
 /* ------------------------------------------------------------------- UI */
 function updateUI() {
   const isFP = state.mode === 'fp';
-  modeBtn.textContent = isFP ? 'Volver a Vista Orbital' : 'Explorar (1ª Persona)';
+  modeBtn.textContent = isFP ? 'Volver a Vista Orbital' : 'Explorar Superficie';
+  if (viewToggleBtn) {
+    viewToggleBtn.hidden = !isFP;
+    viewToggleBtn.textContent = state.fpThirdPerson
+      ? '🎥 Vista: 3ª Persona [V]'
+      : '🎥 Vista: 1ª Persona [V]';
+  }
   hintEl.textContent = isFP
-    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · Ratón = Mirar · E = Analizar · C = Radio · T = Tormenta · M = Modo ruta · ESC = Salir'
+    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · E = Analizar · C = Radio · T = Tormenta · M = Modo ruta · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
 }

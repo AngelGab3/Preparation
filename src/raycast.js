@@ -171,6 +171,9 @@ export function raycastTerrain(e) {
   raycaster.setFromCamera(mouse, camera);
   raycaster.near = 0;
   raycaster.far  = Infinity;
+  if (state.lodGroup && state.lodGroup.children.length) {
+    return raycaster.intersectObject(state.lodGroup, true);
+  }
   return raycaster.intersectObject(state.terrainMesh, false);
 }
 

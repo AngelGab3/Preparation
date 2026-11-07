@@ -2513,3 +2513,28 @@ body:not(.fp) .group-status-panel {
   border-radius: 3px;
   line-height: 1.4;
 }
+/* ------------------------------------------------ Selector de vista 1ª/3ª persona */
+.view-toggle-btn {
+  font-family: inherit;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid rgba(102, 252, 241, 0.45);
+  background: rgba(102, 252, 241, 0.1);
+  color: var(--hud-cyan);
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease, box-shadow 0.18s ease;
+}
+.view-toggle-btn:hover,
+.view-toggle-btn:focus-visible {
+  background: var(--hud-cyan);
+  color: #081216;
+  box-shadow: 0 0 14px rgba(102, 252, 241, 0.45);
+  outline: none;
+}
+.view-toggle-btn[hidden] {
+  display: none !important;
+}

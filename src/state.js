@@ -5,6 +5,7 @@ import { CONFIG } from './config.js';
 
 export const state = {
   mode: 'orbit',
+  fpThirdPerson: false, // false = 1ª persona (casco), true = 3ª persona (detrás del astronauta)
   exaggeration: 2.0,
   datasetId: null,
   metadata: null,
@@ -98,6 +99,8 @@ export const state = {
   boundsZ: 490,        // _m
 
   /* Parche local de alta resolución en 1ª persona (T5) */
+  lodGroup: null,
+  lodStats: null,
   localPatchMesh: null,
   localPatchGeo: null,
   localPatchHeights: null,
