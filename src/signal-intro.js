@@ -126,8 +126,8 @@ function tone(f,d=.3,volume=.12,type='sine'){if(!audioContext)return;const t=aud
 function syncAudioLabel(){const on=audioContext&&audioMaster.gain.value>0;el('signal-sound').textContent=on?'♪ SONIDO ACTIVADO':'♪ ACTIVAR SONIDO';el('signal-sound').setAttribute('aria-pressed',String(!!on))}
 function setText(chapter,title,sub,hint){el('signal-kicker').textContent=chapter;el('signal-title').textContent=title;el('signal-subtitle').textContent=sub;el('signal-hint').textContent=hint}
 function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
-function finish(){if(ready)return;ready=true;playing=false;ui.classList.add('is-ready');setText('04 / SUPERFICIE MARCIANA','EL NUEVO HORIZONTE','El terreno te espera. Continúa al mapa para explorar.','VISOR EVA ACTIVO · SUPERFICIE DISPONIBLE');el('signal-continue').hidden=false;el('signal-continue').focus({preventScroll:true});tone(392,.6,.06)}
-function reset(){playing=false;ready=false;elapsed=0;prevPhase='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
+function finish(){if(ready)return;ready=true;playing=false;ui.classList.add('is-ready');setText('04 / SUPERFICIE MARCIANA','EL NUEVO HORIZONTE','El terreno te espera. Continúa al mapa para explorar.','VISOR EVA ACTIVO · SUPERFICIE DISPONIBLE');el('signal-continue').hidden=false;el('signal-skip').hidden=true;el('signal-continue').focus({preventScroll:true});tone(392,.6,.06)}
+function reset(){playing=false;ready=false;elapsed=0;prevPhase='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;el('signal-skip').hidden=false;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
 function phaseUpdate(phase){
  if(phase===prevPhase)return;prevPhase=phase;ui.dataset.phase=phase;
  if(phase==='earth')setText('01 / TIERRA','EL PRIMER PASO','El astronauta se dirige al cohete.','RUMBO A MARTE · PREPARANDO DESPEGUE');
@@ -175,7 +175,7 @@ function frame(now){
 export const isIntroCinematicActive=()=>active;
 export function initIntroCinematic(){
  if(!ui)return;initWorld();
- el('signal-start').onclick=start;el('signal-continue').onclick=stopIntroCinematic;el('signal-replay').onclick=reset;
+ el('signal-start').onclick=start;el('signal-continue').onclick=stopIntroCinematic;el('signal-skip').onclick=stopIntroCinematic;el('signal-replay').onclick=reset;
  el('signal-sound').onclick=()=>{if(!audioContext){audioOn();audioContext?.resume()}else audioMaster.gain.value=audioMaster.gain.value>0?0:.24;syncAudioLabel()};
  document.getElementById('replay-cinematic-btn')?.addEventListener('click',()=>startIntroCinematic());
  document.addEventListener('visibilitychange',()=>{if(!audioContext)return;if(document.hidden)audioContext.suspend();else if(active)audioContext.resume()});
@@ -191,5 +191,6 @@ export function tickIntroCinematic(){}
 export function stopIntroCinematic(){
  if(!active)return;active=false;ui.classList.add('hidden');document.body.classList.remove('intro-playing');siblings.forEach(([node,inert])=>node.inert=inert);siblings=[];state.orbitControls.enabled=savedOrbit;
  if(audioContext){clearInterval(musicLoop);audioContext.close();audioContext=null;audioMaster=null}
+ playing=false;syncAudioLabel();
  (savedFocus?.tagName==='BUTTON'?savedFocus:document.getElementById('mode-btn'))?.focus({preventScroll:true});
 }

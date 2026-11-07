@@ -5,7 +5,7 @@ import { CONFIG } from './config.js';
 
 export const state = {
   mode: 'orbit',
-  fpThirdPerson: false, // false = 1ª persona (casco), true = 3ª persona (detrás del astronauta)
+  fpThirdPerson: true, // mostrar el astronauta al entrar; V alterna con el visor en 1ª persona
   exaggeration: 2.0,
   datasetId: null,
   metadata: null,

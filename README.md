@@ -62,8 +62,14 @@ python3 data_pipeline/validate_contracts.py
 
 ## Pantalla de inicio: Tierra → Marte → visor EVA
 
-La portada narra tres escenas 3D. En la Tierra, el astronauta camina hacia un cohete de mayor tamaño y este despega. El viaje muestra Sol, Tierra, Marte y la ruta punteada del cohete. En Marte, el cohete aterriza, el astronauta sale y la cámara avanza hasta su visor. La secuencia termina con terreno marciano en primera persona, polvo en movimiento y el botón «Ir al mapa principal». La música y los efectos sintetizados con Web Audio comienzan tras la interacción del usuario; «Repetir viaje» reinicia la historia.
+La portada narra tres escenas 3D. En la Tierra, el astronauta camina hacia un cohete de mayor tamaño y este despega. El viaje muestra Sol, Tierra, Marte y la ruta punteada del cohete. En Marte, el cohete aterriza, el astronauta sale y la cámara avanza hasta su visor. La secuencia termina con terreno marciano en primera persona, polvo en movimiento y el botón «Ir al mapa principal». El botón «Saltar introducción» está disponible desde el inicio y durante el viaje para abrir el mapa inmediatamente. La música y los efectos sintetizados con Web Audio comienzan tras la interacción del usuario; «Repetir viaje» reinicia la historia.
 
 Ejecutar con `npm install && npm run dev` y abrir `http://localhost:8000/?dataset=jezero_test`. `?nointro=1` abre el mapa directamente. Los terrenos y planetas de la introducción son representaciones artísticas; el DEM científico solo se utiliza en el mapa principal.
 
-La secuencia se comprobó visualmente en Vite desde la Tierra hasta el visor EVA; también se verificó el botón final y el acceso al mapa. El mapa conserva su cargador y controles. La apariencia del astronauta sigue siendo estilizada respecto de la referencia aprobada. Falta validar rendimiento y audio en dispositivos físicos.
+### Visor EVA en primera persona
+
+Al entrar a explorar se muestra primero el astronauta en tercera persona. Pulsa `V` o el botón de vista para entrar al casco: aparecen el contorno curvo, los cierres laterales y el reflejo tenue del visor. La telemetría de oxígeno, pendiente, velocidad, radar y avisos se distribuye junto a los bordes; la mira queda pequeña en el centro. Pulsa `V` otra vez para volver a tercera persona. El marco no aparece en la vista orbital ni en tercera persona.
+
+La marcha en tercera persona usa cintura y punta de bota articuladas, contramovimiento de hombros y cadera, flexión de rodillas, tobillos, muñecas y dedos, y una pose amortiguada al saltar. El ciclo sigue la velocidad real del astronauta y continúa internamente mientras se usa el casco para que el regreso a tercera persona no corte el movimiento.
+
+La secuencia se comprobó visualmente en Vite desde la Tierra hasta el visor EVA; también se verificó el botón final y el acceso al mapa. El mapa conserva su cargador y controles. El mapa usa ahora el mismo astronauta articulado de la introducción al entrar en tercera persona. La marcha, el giro, el arranque, la frenada y el seguimiento de cámara usan interpolación dependiente del tiempo; al detenerse, el personaje vuelve a una pose de reposo con movimiento sutil. `V` alterna con el visor en primera persona. Falta validar el rendimiento y los controles con teclado/ratón en dispositivos físicos.

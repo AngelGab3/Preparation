@@ -77,6 +77,8 @@ export function togglePerspectiveView() {
 const _fwd = new THREE.Vector3();
 const _right = new THREE.Vector3();
 const _move = new THREE.Vector3();
+const moveVelocity = new THREE.Vector3();
+const cameraFollowTarget = new THREE.Vector3();
 const _lookDir = new THREE.Vector3();
 const WORLD_UP = new THREE.Vector3(0, 1, 0);
 
@@ -250,6 +252,7 @@ export function enterFirstPerson(lookTarget = null) {
   keys.clear();
   vy = 0;
   isGrounded = true;
+  moveVelocity.set(0, 0, 0);
   hideInfoPopup();
 
   camera.up.set(0, 1, 0);
@@ -300,6 +303,7 @@ export function leaveFirstPerson() {
   if (state.mode !== 'fp') return;
   state.mode = 'orbit';
   keys.clear();
+  moveVelocity.set(0, 0, 0);
   if (state.fpControls.isLocked) state.fpControls.unlock();
 
   disableLocalPatch();
@@ -378,14 +382,17 @@ function updateFirstPerson(dt) {
   _move.set(0, 0, 0)
     .addScaledVector(_fwd, forwardInput)
     .addScaledVector(_right, strafeInput);
+  if (_move.lengthSq() > 1) _move.normalize();
+  _move.multiplyScalar(speed_ms);
 
-  if (_move.lengthSq() > 0 && speed_ms > 0) {
-    _move.normalize().multiplyScalar(speed_ms * dt);
-    playerPos.x += _move.x;
-    playerPos.z += _move.z;
-    playerYaw = Math.atan2(_move.x, _move.z);
-  } else {
-    playerYaw = Math.atan2(_fwd.x, _fwd.z);
+  // Aceleración y frenado dependen del tiempo real, no de la frecuencia de cuadros.
+  const response = _move.lengthSq() > 0 ? 6.5 : 9.0;
+  moveVelocity.lerp(_move, 1 - Math.exp(-response * dt));
+  if (moveVelocity.lengthSq() < 0.0001) moveVelocity.set(0, 0, 0);
+  playerPos.x += moveVelocity.x * dt;
+  playerPos.z += moveVelocity.z * dt;
+  if (moveVelocity.lengthSq() > 0.0025) {
+    playerYaw = Math.atan2(moveVelocity.x, moveVelocity.z);
   }
 
   /* --- Bounds --- */
@@ -438,7 +445,7 @@ function updateFirstPerson(dt) {
 
   /* --- Cámara en 1ª / 3ª persona (transición suave con tpBlend) --- */
   const targetBlend = state.fpThirdPerson ? 1 : 0;
-  tpBlend += (targetBlend - tpBlend) * Math.min(1, dt * 10);
+  tpBlend += (targetBlend - tpBlend) * (1 - Math.exp(-10 * dt));
   if (Math.abs(targetBlend - tpBlend) < 0.002) tpBlend = targetBlend;
 
   const footY = playerPos.y - state.fisio.eye_height_m;
@@ -474,7 +481,8 @@ function updateFirstPerson(dt) {
     if (camGroundY !== null) {
       camY = Math.max(camY, camGroundY + 0.55);
     }
-    camera.position.set(camX, camY, camZ);
+    cameraFollowTarget.set(camX, camY, camZ);
+    camera.position.lerp(cameraFollowTarget, 1 - Math.exp(-8 * dt));
   }
 
   const isMoving = stepDist_m > 1e-4;
@@ -937,6 +945,7 @@ function updateUI() {
     ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
+  document.body.classList.toggle('helmet-view', isFP && !state.fpThirdPerson);
 }
 /* === Comparador clásico vs salud (Fase G2.5) === */
 

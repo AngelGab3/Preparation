@@ -2572,3 +2572,203 @@ body:not(.fp) .group-status-panel {
 .view-toggle-btn[hidden] {
   display: none !important;
 }
+
+
+/* Casco EVA: marco físico y proyección de telemetría solo en primera persona. */
+.helmet-shell {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .5s ease;
+}
+body.helmet-view .helmet-shell { opacity: 1; }
+.helmet-shell::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(ellipse 72% 69% at 50% 49%, transparent 58%, rgba(4, 13, 18, .18) 76%, rgba(2, 7, 12, .7) 100%),
+    linear-gradient(90deg, rgba(1, 8, 12, .22), transparent 22%, transparent 78%, rgba(1, 8, 12, .22));
+}
+.helmet-shell-rim {
+  position: absolute;
+  inset: -2% -1.5%;
+  border: clamp(32px, 5.3vw, 72px) solid rgba(7, 15, 21, .97);
+  border-radius: 40% 40% 32% 32% / 27% 27% 20% 20%;
+  box-shadow:
+    inset 0 0 0 2px rgba(170, 225, 216, .23),
+    inset 0 0 28px rgba(88, 205, 205, .18),
+    0 0 0 2px rgba(3, 8, 12, .9);
+}
+.helmet-shell-rim::after {
+  content: '';
+  position: absolute;
+  inset: 7px;
+  border: 1px solid rgba(183, 236, 225, .18);
+  border-radius: inherit;
+  box-shadow: inset 0 0 24px rgba(79, 218, 208, .13);
+}
+.helmet-shell-brow,
+.helmet-shell-chin {
+  position: absolute;
+  left: 0;
+  right: 0;
+  background: linear-gradient(180deg, #0b151c, #17242a 52%, rgba(7, 15, 21, .88));
+  border-color: rgba(161, 220, 208, .2);
+}
+.helmet-shell-brow {
+  top: 0;
+  height: 74px;
+  border-bottom: 2px solid rgba(161, 220, 208, .2);
+  border-radius: 0 0 48% 48% / 0 0 60% 60%;
+  box-shadow: 0 12px 28px rgba(1, 8, 12, .35);
+}
+.helmet-shell-chin {
+  bottom: 0;
+  height: 90px;
+  border-top: 2px solid rgba(161, 220, 208, .22);
+  border-radius: 44% 44% 0 0 / 54% 54% 0 0;
+  box-shadow: 0 -12px 28px rgba(1, 8, 12, .45);
+}
+.helmet-shell-glass {
+  position: absolute;
+  inset: 6% 5%;
+  border-radius: 38% / 28%;
+  background:
+    radial-gradient(ellipse at 32% 8%, rgba(190, 244, 235, .12), transparent 34%),
+    linear-gradient(112deg, transparent 13%, rgba(222, 255, 249, .06) 25%, transparent 37%, transparent 71%, rgba(184, 244, 239, .045) 81%, transparent 88%);
+}
+.helmet-shell-latch {
+  position: absolute;
+  top: 49%;
+  width: 30px;
+  height: 82px;
+  border: 1px solid rgba(159, 218, 210, .3);
+  border-radius: 10px;
+  background: linear-gradient(90deg, #0a1218, #24333a 55%, #0b171c);
+  box-shadow: inset 0 0 0 5px #0a1318, 0 0 12px #030b0d;
+}
+.helmet-shell-latch::after {
+  content: '';
+  position: absolute;
+  top: 29px;
+  left: 8px;
+  width: 11px;
+  height: 11px;
+  border: 2px solid rgba(176, 229, 215, .65);
+  border-radius: 50%;
+  box-shadow: 0 0 9px rgba(111, 236, 217, .4);
+}
+.helmet-shell-latch-left { left: 1.6%; transform: rotate(-7deg); }
+.helmet-shell-latch-right { right: 1.6%; transform: rotate(7deg); }
+.helmet-shell-label {
+  position: absolute;
+  left: 50%;
+  bottom: 19px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 76vw;
+  color: rgba(191, 226, 217, .68);
+  font: 9px 'JetBrains Mono', ui-monospace, monospace;
+  letter-spacing: .14em;
+  text-align: center;
+  white-space: nowrap;
+}
+
+body.helmet-view .hud-top-left { top: 76px; left: 76px; min-width: 0; width: min(350px, 30vw); }
+body.helmet-view .hud-tag { color: var(--hud-cyan); border-color: rgba(102, 252, 241, .45); text-shadow: 0 0 8px rgba(102, 252, 241, .4); }
+body.helmet-view .hud-env-line { line-height: 1.4; }
+body.helmet-view .hud-science-log { max-width: 330px; }
+body.helmet-view .hud-sci-list { max-height: 42px; }
+body.helmet-view .controls { top: 74px; right: 76px; }
+body.helmet-view .group-status-panel { top: 205px; right: 76px; }
+body.helmet-view .hud-bottom-left { left: 76px; bottom: 105px; }
+body.helmet-view .hud-bottom-center { left: 76px; bottom: 205px; transform: none; align-items: flex-start; }
+body.helmet-view .hud-bottom-right { right: 76px; bottom: 104px; }
+body.helmet-view .hint { display: none; }
+
+/* El centro conserva solo una mira pequeña; avisos y lectura se proyectan al borde del visor. */
+body.helmet-view .hud-center-reticle { display: contents; }
+body.helmet-view .reticle-top-bar { position: fixed; top: 254px; left: 76px; width: 210px; }
+body.helmet-view .reticle-brackets {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  width: 132px;
+  height: 84px;
+  transform: translate(-50%, -50%);
+  opacity: .56;
+}
+body.helmet-view .reticle-segments { display: none; }
+body.helmet-view .hud-interact-prompt {
+  position: fixed;
+  left: 50%;
+  bottom: 112px;
+  width: max-content;
+  max-width: min(470px, calc(100vw - 160px));
+  margin: 0;
+  transform: translateX(-50%);
+  line-height: 1.35;
+  animation: helmet-prompt-glow 1.2s ease-in-out infinite alternate;
+}
+body.helmet-view .hud-science-toast {
+  position: fixed;
+  top: 350px;
+  right: 76px;
+  width: min(310px, 30vw);
+  max-height: 180px;
+  overflow-y: auto;
+  margin: 0;
+}
+body.helmet-view .hud-radio-toast,
+body.helmet-view .hud-radio-toast.visible {
+  position: fixed;
+  top: 350px;
+  right: 76px;
+  left: auto;
+  width: min(320px, 30vw);
+  margin: 0;
+  transform: none;
+}
+@keyframes helmet-prompt-glow {
+  from { box-shadow: 0 0 9px rgba(102, 252, 241, .18); }
+  to { box-shadow: 0 0 20px rgba(102, 252, 241, .42); }
+}
+
+@media (max-width: 760px) {
+  .helmet-shell-rim { border-width: 29px; }
+  .helmet-shell-brow { height: 57px; }
+  .helmet-shell-chin { height: 76px; }
+  .helmet-shell-latch { display: none; }
+  .helmet-shell-label { bottom: 16px; max-width: 82vw; font-size: 7px; letter-spacing: .06em; white-space: normal; }
+  body.helmet-view .controls { top: 58px; right: 36px; min-width: 180px; max-width: 225px; }
+  body.helmet-view .hud-top-left { top: 180px; left: 38px; width: calc(100vw - 76px); max-width: 290px; }
+  body.helmet-view .hud-sub-status { font-size: 9px; }
+  body.helmet-view .hud-science-log, body.helmet-view .hud-env-line, body.helmet-view .group-status-panel { display: none !important; }
+  body.helmet-view .reticle-top-bar { top: 302px; left: 38px; width: 160px; }
+  body.helmet-view .hud-bottom-left { left: 35px; bottom: 88px; transform: scale(.75); transform-origin: bottom left; }
+  body.helmet-view .hud-bottom-center { left: auto; right: 38px; bottom: 265px; transform: scale(.8); transform-origin: bottom right; }
+  body.helmet-view .hud-ecg-row, body.helmet-view .hud-status-Hex-row { display: none; }
+  body.helmet-view .hud-bottom-right { right: 35px; bottom: 88px; transform: scale(.76); transform-origin: bottom right; }
+  body.helmet-view .hud-minimap-card { display: none; }
+  body.helmet-view .hud-interact-prompt { bottom: 202px; max-width: calc(100vw - 76px); font-size: 9px; }
+  body.helmet-view .hud-science-toast, body.helmet-view .hud-radio-toast, body.helmet-view .hud-radio-toast.visible {
+    top: auto;
+    right: 38px;
+    bottom: 320px;
+    width: min(280px, calc(100vw - 76px));
+  }
+}
+@media (max-height: 620px) and (min-width: 761px) {
+  body.helmet-view .hud-top-left, body.helmet-view .controls { top: 60px; }
+  body.helmet-view .group-status-panel { top: 168px; }
+  body.helmet-view .reticle-top-bar { top: 205px; }
+  body.helmet-view .hud-bottom-center { bottom: 175px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .helmet-shell { transition: none; }
+  body.helmet-view .hud-interact-prompt { animation: none; }
+}
