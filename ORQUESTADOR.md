@@ -297,6 +297,8 @@ python -m http.server 8000
 
 | 2026-11-07 | Codex | Estación EVA y terreno: reemplazado el hábitat grande por núcleo, dos módulos presurizados, esclusa, soportes, paneles y antenas. Huella medida con Box3: 14.40×9.60 m → 8.82×6.12 m y altura 7.35 → 4.19 m. En primera persona se añadió horizonte de baja densidad derivado del mismo DEM, con color y niebla gradual, y rocas/grava instanciadas sobre alturas reales; vista station-preview.html. Supuesto: mantener intactos el DEM, la física y el coste de rutas; las rocas son decoración visual. Medición: `npm run check`, 37 pruebas y `git diff --check` correctos, además de revisión visual de la estación y superficie en Jezero. | Medir FPS en dispositivo físico y revisar el horizonte en otros datasets. Cambios solo locales, sin commit ni publicación. |
 
+| 2026-11-07 | Codex | Publicadas en la rama existente `Nasa_Saul` las mejoras locales de introducción, Robert, estación y terreno mediante PR #4 hacia `main`. Supuesto: el PR #3 ya fusionado corresponde a la entrega anterior; se conservó la misma rama y se excluyeron los 13 archivos preparados por separado. Medición: PR #4 abierto y fusionable, siete archivos de producto en el primer commit; `npm run check` y 37 pruebas correctos. | Revisión y fusión del PR #4 por el usuario; los 13 archivos preparados por separado permanecen fuera del PR. |
+
 **Decisiones abiertas (no resolverlas sin consultar al equipo)**
 - ¿Zona de estudio definitiva? (Jezero, Gale u otra, o la que entregue la competencia).
 - ¿Resolución objetivo del DEM y tamaño del parche local?
