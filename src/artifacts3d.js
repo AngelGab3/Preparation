@@ -184,14 +184,18 @@ export function buildHumanScalePOIArtifactGroup(poi, poiIndex = 0, opacity = 1.0
     const habitat = createMarsHabitatMesh();
     placeOnGround(habitat, 0, 0, 0);
 
-    const perseverance = createPerseveranceRoverMesh(poiIndex, true);
-    perseverance.rotation.y = 0.45;
-    placeOnGround(perseverance, 8.5, 5.0, 0);
-    perseverance.userData.shelterBase = { cx_m, cz_m, cy_m };
-    perseverance.userData.worldX = cx_m + 8.5;
-    perseverance.userData.worldZ = cz_m + 5.0;
-    perseverance.userData.yaw = 0.45;
-    companionRover = perseverance;
+    // Un único Robert: conservar el rover del último refugio, que ya era el compañero móvil.
+    const roverHome = state.pois.filter((p) => p.type === 'shelter').at(-1);
+    if (poi === roverHome) {
+      const perseverance = createPerseveranceRoverMesh(poiIndex, true);
+      perseverance.rotation.y = 0.45;
+      placeOnGround(perseverance, 8.5, 5.0, 0);
+      perseverance.userData.shelterBase = { cx_m, cz_m, cy_m };
+      perseverance.userData.worldX = cx_m + 8.5;
+      perseverance.userData.worldZ = cz_m + 5.0;
+      perseverance.userData.yaw = 0.45;
+      companionRover = perseverance;
+    }
 
     const ingenuity = createIngenuityHelicopterMesh(poiIndex);
     ingenuity.rotation.y = -0.3;
@@ -201,12 +205,7 @@ export function buildHumanScalePOIArtifactGroup(poi, poiIndex = 0, opacity = 1.0
     const depot = createSampleDepotMesh(poiIndex);
     placeOnGround(depot, 0, 0, 0);
 
-    if (poiIndex % 2 === 1) {
-      /* En sitios de muestreo destacados (ej. Delta Three Forks), colocar un Rover en plena operación científica */
-      const sciRover = createPerseveranceRoverMesh(poiIndex + 10);
-      sciRover.rotation.y = -0.85;
-      placeOnGround(sciRover, 4.2, -3.2, 0);
-    }
+
   } else if (poi.type === 'hazard') {
     /* ZONA DE PELIGRO: Balizas estroboscópicas de advertencia EVA */
     const hazardRig = createHazardWarningRigMesh(poiIndex);
@@ -224,147 +223,154 @@ export function createPerseveranceRoverMesh(seed = 0, isCompanion = false) {
   rover.name = isCompanion ? 'companionRoverRobert' : 'perseveranceRover';
   rover.userData.wheels = [];
 
-  const bodyMat = new THREE.MeshStandardMaterial({ color: 0xedeae2, roughness: 0.45, metalness: 0.25 });
-  const goldMat = new THREE.MeshStandardMaterial({ color: 0xd4a238, roughness: 0.32, metalness: 0.72 });
-  const darkMat = new THREE.MeshStandardMaterial({ color: 0x22272e, roughness: 0.65, metalness: 0.45 });
-  const alumMat = new THREE.MeshStandardMaterial({ color: 0x9aa4b2, roughness: 0.4,  metalness: 0.75 });
-  const lensMat = new THREE.MeshBasicMaterial({ color: 0x66fcf1 });
-  const laserMat = new THREE.MeshBasicMaterial({ color: 0xff3855 });
+  const shell = new THREE.MeshStandardMaterial({ color: 0xe6dfd0, roughness: 0.7, metalness: 0.2 });
+  const ceramic = new THREE.MeshStandardMaterial({ color: 0xf5eee0, roughness: 0.54, metalness: 0.12 });
+  const foil = new THREE.MeshStandardMaterial({ color: 0x8b6034, roughness: 0.72, metalness: 0.42 });
+  const copper = new THREE.MeshStandardMaterial({ color: 0xb16a3a, roughness: 0.52, metalness: 0.58 });
+  const carbon = new THREE.MeshStandardMaterial({ color: 0x252629, roughness: 0.88 });
+  const tire = new THREE.MeshStandardMaterial({ color: 0x373533, roughness: 0.96 });
+  const metal = new THREE.MeshStandardMaterial({ color: 0x9c9b91, roughness: 0.48, metalness: 0.7 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x10151a, roughness: 0.16, metalness: 0.22 });
 
-  /* 1. Ruedas (6 ruedas de Ø 0.52 m con suspensión rocker-bogie) */
-  const wheelGeo = new THREE.CylinderGeometry(0.27, 0.27, 0.24, 16);
-  wheelGeo.rotateZ(Math.PI / 2);
-  const hubGeo = new THREE.CylinderGeometry(0.14, 0.14, 0.26, 10);
-  hubGeo.rotateZ(Math.PI / 2);
+  const part = (parent, geometry, material, x = 0, y = 0, z = 0) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  const box = (parent, dimensions, material, x, y, z) =>
+    part(parent, new THREE.BoxGeometry(...dimensions), material, x, y, z);
+  const cylinder = (parent, radius, height, material, x, y, z, sides = 12) =>
+    part(parent, new THREE.CylinderGeometry(radius, radius, height, sides), material, x, y, z);
+  const beam = (parent, from, to, radius, material) => {
+    const start = new THREE.Vector3(...from);
+    const end = new THREE.Vector3(...to);
+    const direction = end.clone().sub(start);
+    const mesh = cylinder(parent, radius, direction.length(), material,
+      (start.x + end.x) / 2, (start.y + end.y) / 2, (start.z + end.z) / 2);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), direction.normalize());
+    return mesh;
+  };
 
-  const wheelPositions = [
-    [-1.12, 0.27,  1.08], [1.12, 0.27,  1.08], // Delanteras
-    [-1.18, 0.27,  0.0],  [1.18, 0.27,  0.0],  // Centrales
-    [-1.12, 0.27, -1.08], [1.12, 0.27, -1.08], // Traseras
-  ];
+  // Seis ruedas con nervaduras y aros que giran junto con la llanta.
+  for (const side of [-1, 1]) {
+    for (const z of [1.08, 0, -1.08]) {
+      const x = side * (z === 0 ? 1.18 : 1.12);
+      const wheel = new THREE.Group();
+      wheel.position.set(x, .29, z);
+      rover.add(wheel);
+      const rim = cylinder(wheel, .285, .26, tire, 0, 0, 0, 20);
+      rim.rotation.z = Math.PI / 2;
+      const inner = cylinder(wheel, .19, .275, metal, 0, 0, 0, 20);
+      inner.rotation.z = Math.PI / 2;
+      const outerX = side * .151;
+      const ring = part(wheel, new THREE.TorusGeometry(.17, .023, 6, 20), copper, outerX, 0, 0);
+      ring.rotation.y = Math.PI / 2;
+      const axle = cylinder(wheel, .075, .32, carbon, outerX, 0, 0);
+      axle.rotation.z = Math.PI / 2;
+      for (let i = 0; i < 14; i++) {
+        const angle = i * Math.PI * 2 / 14;
+        const lug = box(wheel, [.275, .022, .065], carbon, 0,
+          Math.cos(angle) * .286, Math.sin(angle) * .286);
+        lug.rotation.x = angle;
+      }
+      rover.userData.wheels.push(wheel);
+    }
 
-  for (const [wx, wy, wz] of wheelPositions) {
-    const wMesh = new THREE.Mesh(wheelGeo, darkMat);
-    wMesh.position.set(wx, wy, wz);
-    rover.add(wMesh);
-    rover.userData.wheels.push(wMesh);
-
-    const hMesh = new THREE.Mesh(hubGeo, alumMat);
-    hMesh.position.set(wx, wy, wz);
-    rover.add(hMesh);
-
-    /* Puntal de suspensión hacia el chasis */
-    const strut = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.68, 8), alumMat);
-    strut.position.set(wx * 0.82, 0.55, wz * 0.88);
-    strut.rotation.z = wx > 0 ? 0.32 : -0.32;
-    rover.add(strut);
+    // Rocker-bogie: dos articulaciones por costado y barras de suspensión expuestas.
+    const x = side * .83;
+    const pivot = part(rover, new THREE.SphereGeometry(.11, 10, 8), metal, x, .73, .06);
+    pivot.name = 'rockerPivot';
+    beam(rover, [x, .73, .06], [side * 1.12, .33, 1.08], .055, metal);
+    beam(rover, [x, .73, .06], [side * 1.02, .51, -.55], .055, metal);
+    beam(rover, [side * 1.02, .51, -.55], [side * 1.18, .33, 0], .047, metal);
+    beam(rover, [side * 1.02, .51, -.55], [side * 1.12, .33, -1.08], .047, metal);
+    beam(rover, [side * .78, .65, .65], [side * 1.12, .42, 1.08], .026, copper);
   }
 
-  /* 2. Chasis principal (WEB - Warm Electronics Box) */
-  const chassis = new THREE.Mesh(new THREE.BoxGeometry(1.55, 0.58, 2.15), bodyMat);
-  chassis.position.set(0, 0.86, 0);
-  rover.add(chassis);
+  // Cuerpo de electrónica y aislamiento térmico dorado, bajo una cubierta ancha.
+  box(rover, [1.55, .55, 2.12], foil, 0, .83, 0);
+  box(rover, [1.62, .16, 2.18], carbon, 0, .53, 0);
+  box(rover, [1.62, .28, 1.86], shell, 0, 1.04, -.08);
+  for (const side of [-1, 1]) {
+    box(rover, [.055, .22, 1.62], foil, side * .82, .84, 0);
+    for (const z of [-.65, -.2, .25, .7]) {
+      box(rover, [.025, .13, .06], copper, side * .86, .84, z);
+    }
+  }
+  box(rover, [1.96, .09, 2.46], carbon, 0, 1.23, 0);
+  for (const side of [-1, 1]) {
+    box(rover, [.75, .055, 2.52], shell, side * 1.36, 1.23, .02);
+    box(rover, [.62, .012, 2.18], carbon, side * 1.36, 1.27, .02);
+    for (const z of [-.78, -.27, .24, .75]) {
+      box(rover, [.62, .014, .025], copper, side * 1.36, 1.28, z);
+    }
+  }
+  box(rover, [.62, .12, .45], ceramic, 0, 1.29, 1.0);
+  box(rover, [.22, .045, .12], copper, 0, 1.37, 1.1);
 
-  const goldBelly = new THREE.Mesh(new THREE.BoxGeometry(1.48, 0.18, 2.05), goldMat);
-  goldBelly.position.set(0, 0.54, 0);
-  rover.add(goldBelly);
+  // Generador trasero, aletas y cableado visible en la cubierta.
+  const generator = cylinder(rover, .24, .85, shell, 0, 1.48, -1.2);
+  generator.rotation.x = -.55;
+  for (const z of [-1.48, -1.3, -1.12, -.94]) {
+    box(rover, [.57, .43, .035], metal, 0, 1.51, z);
+  }
+  beam(rover, [-.52, 1.28, -.78], [-.52, 1.53, -1.21], .022, copper);
+  beam(rover, [-.48, 1.53, -1.21], [.12, 1.51, -1.22], .022, copper);
 
-  /* Cubierta superior de instrumentos con detalles técnicos */
-  const deck = new THREE.Mesh(new THREE.BoxGeometry(1.42, 0.08, 1.95), alumMat);
-  deck.position.set(0, 1.18, 0);
-  rover.add(deck);
+  // Antena de plato y antena vertical independientes del cabezal móvil.
+  beam(rover, [-.53, 1.25, -.55], [-.53, 1.75, -.55], .035, metal);
+  const dish = cylinder(rover, .31, .045, copper, -.53, 1.8, -.55, 24);
+  dish.rotation.x = -.38;
+  cylinder(rover, .07, .058, carbon, -.53, 1.83, -.55);
+  beam(rover, [.57, 1.26, -.73], [.57, 2.0, -.73], .018, metal);
+  cylinder(rover, .045, .08, shell, .57, 2.03, -.73);
 
-  /* 3. Generador nuclear MMRTG trasero inclinado hacia arriba con aletas radiadoras */
-  const mmrtgGroup = new THREE.Group();
-  mmrtgGroup.position.set(0, 1.05, -1.25);
-  mmrtgGroup.rotation.x = -0.45;
-  const rtgCore = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.24, 0.85, 12), bodyMat);
-  mmrtgGroup.add(rtgCore);
-  const rtgFin1 = new THREE.Mesh(new THREE.BoxGeometry(0.62, 0.75, 0.04), alumMat);
-  const rtgFin2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.75, 0.62), alumMat);
-  mmrtgGroup.add(rtgFin1, rtgFin2);
-  rover.add(mmrtgGroup);
-
-  /* 4. Antena de alta ganancia UHF/X-Band en la cubierta trasera */
-  const hgaPole = new THREE.Mesh(new THREE.CylinderGeometry(0.03, 0.03, 0.45, 8), alumMat);
-  hgaPole.position.set(-0.45, 1.42, -0.55);
-  rover.add(hgaPole);
-  const hgaDish = new THREE.Mesh(new THREE.CylinderGeometry(0.22, 0.18, 0.06, 16), goldMat);
-  hgaDish.position.set(-0.45, 1.66, -0.55);
-  hgaDish.rotation.x = 0.35;
-  rover.add(hgaDish);
-
-  /* 5. Mástil Remoto (RSM) y cabezal SuperCam + Mastcam-Z (animado) */
-  const mastPole = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.065, 0.95, 10), bodyMat);
-  mastPole.position.set(0.42, 1.65, 0.68);
-  rover.add(mastPole);
-
+  // Mástil alto y barra de cámaras estéreo, inspirado en la silueta de la referencia.
+  beam(rover, [.27, 1.28, .35], [.27, 2.43, .35], .085, ceramic);
+  for (const y of [1.47, 1.72, 1.97]) {
+    cylinder(rover, .095, .055, metal, .27, y, .35);
+  }
   const mastHead = new THREE.Group();
-  mastHead.position.set(0.42, 2.18, 0.68);
-  mastHead.userData = { baseYaw: 0, phase: seed * 1.7 };
-
-  const headBox = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.28, 0.32), bodyMat);
-  mastHead.add(headBox);
-
-  /* Lente láser circular de SuperCam */
-  const superCamLens = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 0.06, 16), lensMat);
-  superCamLens.rotation.x = Math.PI / 2;
-  superCamLens.position.set(0, 0.04, 0.16);
-  mastHead.add(superCamLens);
-
-  /* Visores estéreo Mastcam-Z */
-  const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.07, 0.05), darkMat);
-  eyeL.position.set(-0.15, -0.05, 0.16);
-  const eyeR = eyeL.clone();
-  eyeR.position.set(0.15, -0.05, 0.16);
-  mastHead.add(eyeL, eyeR);
-
-  animatedMasts.push(mastHead);
-  mastHead.userData.isCompanionMast = isCompanion;
+  mastHead.position.set(.27, 2.48, .35);
+  mastHead.userData = { baseYaw: 0, phase: seed * 1.7, isCompanionMast: isCompanion };
+  box(mastHead, [1.05, .17, .25], shell, 0, 0, 0);
+  box(mastHead, [.22, .21, .28], metal, 0, -.13, 0);
+  for (const side of [-1, 1]) {
+    box(mastHead, [.27, .25, .31], ceramic, side * .38, .08, .09);
+    const lensRim = cylinder(mastHead, .09, .035, copper, side * .38, .08, .265, 18);
+    lensRim.rotation.x = Math.PI / 2;
+    const lens = cylinder(mastHead, .067, .039, glass, side * .38, .08, .29, 18);
+    lens.rotation.x = Math.PI / 2;
+    cylinder(mastHead, .026, .048, metal, side * .38, .08, .315);
+  }
+  box(mastHead, [.21, .18, .31], carbon, 0, .085, .12);
+  const superCam = cylinder(mastHead, .078, .08, glass, 0, .085, .3, 18);
+  superCam.rotation.x = Math.PI / 2;
   rover.userData.mastHead = mastHead;
+  animatedMasts.push(mastHead);
   rover.add(mastHead);
 
-  /* 6. Brazo robótico frontal articulado con torreta PIXL / SHERLOC y haz láser de análisis */
+  // Brazo robótico frontal de dos tramos, articulaciones y torreta de muestras.
   const armGroup = new THREE.Group();
-  armGroup.position.set(-0.15, 0.95, 1.08);
-
-  const boom1 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.04, 0.85, 8), alumMat);
-  boom1.rotation.x = Math.PI / 2 - 0.35;
-  boom1.position.set(0, -0.14, 0.38);
-  armGroup.add(boom1);
-
-  const boom2 = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.035, 0.72, 8), alumMat);
-  boom2.rotation.x = Math.PI / 2 + 0.55;
-  boom2.position.set(0, -0.42, 0.88);
-  armGroup.add(boom2);
-
-  const turret = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 0.22, 12), darkMat);
-  turret.position.set(0, -0.62, 1.15);
-  armGroup.add(turret);
-
-  if (!isCompanion) {
-    /* Haz láser rojo de espectrometría apuntando a una roca objetivo frente al rover estático */
-    const laserBeam = new THREE.Mesh(new THREE.CylinderGeometry(0.01, 0.025, 0.35, 8), laserMat);
-    laserBeam.position.set(0, -0.78, 1.15);
-    armGroup.add(laserBeam);
-
-    const targetRock = new THREE.Mesh(
-      new THREE.DodecahedronGeometry(0.28, 1),
-      new THREE.MeshStandardMaterial({ color: 0x7c432b, roughness: 0.92 })
-    );
-    targetRock.scale.set(1.3, 0.65, 1.1);
-    targetRock.position.set(-0.15, 0.12, 2.23);
-    rover.add(targetRock);
-  } else {
-    /* Pliegue de marcha del brazo para el Rover compañero "Robert" */
-    armGroup.rotation.x = -0.35;
+  armGroup.position.set(-.5, .92, 1.05);
+  cylinder(armGroup, .16, .22, metal, 0, 0, 0);
+  beam(armGroup, [0, 0, .05], [-.38, -.22, .54], .073, ceramic);
+  cylinder(armGroup, .12, .18, copper, -.38, -.22, .54);
+  beam(armGroup, [-.38, -.22, .54], [-.62, -.46, 1.08], .057, metal);
+  cylinder(armGroup, .16, .21, carbon, -.62, -.46, 1.08);
+  box(armGroup, [.23, .16, .23], ceramic, -.62, -.53, 1.2);
+  for (const side of [-1, 1]) {
+    beam(armGroup, [-.62 + side * .065, -.55, 1.2],
+      [-.62 + side * .15, -.61, 1.34], .019, metal);
   }
-
+  if (isCompanion) armGroup.rotation.x = -.18;
   rover.add(armGroup);
 
   return rover;
 }
-
 /**
  * Construye el Helicóptero Marciano NASA Ingenuity con rotores coaxiales animados.
  */
@@ -426,76 +432,129 @@ export function createMarsHabitatMesh() {
   const hab = new THREE.Group();
   hab.name = 'marsEvaHabitat';
 
-  const whiteMat  = new THREE.MeshStandardMaterial({ color: 0xf0f2f5, roughness: 0.5, metalness: 0.2 });
-  const metalMat  = new THREE.MeshStandardMaterial({ color: 0x6e7885, roughness: 0.4, metalness: 0.7 });
-  const solarMat  = new THREE.MeshStandardMaterial({ color: 0x15315c, roughness: 0.3, metalness: 0.65 });
-  const windowMat = new THREE.MeshBasicMaterial({ color: 0xf6c945 });
-  const greenLightMat = new THREE.MeshBasicMaterial({ color: 0x55f29b });
+  const shell = new THREE.MeshStandardMaterial({ color: 0xeae4d9, roughness: 0.7, metalness: 0.18 });
+  const trim = new THREE.MeshStandardMaterial({ color: 0x9b9b96, roughness: 0.48, metalness: 0.62 });
+  const dark = new THREE.MeshStandardMaterial({ color: 0x2f363b, roughness: 0.72, metalness: 0.25 });
+  const glass = new THREE.MeshStandardMaterial({ color: 0x304c55, roughness: 0.16, metalness: 0.25, emissive: 0x10272e, emissiveIntensity: 0.35 });
+  const copper = new THREE.MeshStandardMaterial({ color: 0xbd7852, roughness: 0.58, metalness: 0.42 });
+  const solar = new THREE.MeshStandardMaterial({ color: 0x1c3441, roughness: 0.3, metalness: 0.5 });
+  const entry = new THREE.MeshBasicMaterial({ color: 0x72edbd });
 
-  /* Plataforma circular de cimentación */
-  const pad = new THREE.Mesh(new THREE.CylinderGeometry(4.4, 4.8, 0.28, 24), metalMat);
-  pad.position.set(0, 0.14, 0);
-  hab.add(pad);
+  const part = (parent, geometry, material, x = 0, y = 0, z = 0) => {
+    const mesh = new THREE.Mesh(geometry, material);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  };
+  const box = (parent, size, material, x, y, z) =>
+    part(parent, new THREE.BoxGeometry(...size), material, x, y, z);
+  const tube = (parent, radius, length, material, x, y, z, sides = 16) =>
+    part(parent, new THREE.CylinderGeometry(radius, radius, length, sides), material, x, y, z);
+  const beam = (parent, from, to, radius, material) => {
+    const a = new THREE.Vector3(...from), b = new THREE.Vector3(...to);
+    const dir = b.clone().sub(a);
+    const mesh = tube(parent, radius, dir.length(), material,
+      (a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2, 8);
+    mesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir.normalize());
+    return mesh;
+  };
 
-  /* Cilindro base presurizado y domo hemisférico superior */
-  const cylinder = new THREE.Mesh(new THREE.CylinderGeometry(3.4, 3.4, 2.2, 24), whiteMat);
-  cylinder.position.set(0, 1.38, 0);
-  hab.add(cylinder);
+  // Núcleo presurizado compacto: diámetro 2.8 m, sin la antigua plataforma de 9.6 m.
+  tube(hab, 1.48, .18, trim, 0, .14, 0, 24);
+  for (const a of [0, Math.PI / 2, Math.PI, 3 * Math.PI / 2]) {
+    const x = Math.sin(a) * 1.1, z = Math.cos(a) * 1.1;
+    tube(hab, .075, .44, trim, x, .39, z, 8);
+  }
+  tube(hab, 1.38, 1.56, shell, 0, 1.39, 0, 24);
+  const dome = part(hab,
+    new THREE.SphereGeometry(1.38, 24, 12, 0, Math.PI * 2, 0, Math.PI / 2),
+    shell, 0, 2.17, 0);
+  dome.name = 'habitatDome';
+  const ring = part(hab, new THREE.TorusGeometry(1.4, .045, 8, 32), copper, 0, 2.17, 0);
+  ring.rotation.x = Math.PI / 2;
+  for (let i = 0; i < 10; i++) {
+    const a = i * Math.PI * 2 / 10;
+    beam(hab, [Math.sin(a) * 1.36, 2.19, Math.cos(a) * 1.36],
+      [Math.sin(a) * .22, 3.53, Math.cos(a) * .22], .025, trim);
+    if (i % 2 === 0) {
+      const window = box(hab, [.31, .3, .06], glass,
+        Math.sin(a) * 1.385, 1.51, Math.cos(a) * 1.385);
+      window.rotation.y = a;
+    }
+  }
+  tube(hab, .24, .08, dark, 0, 3.53, 0, 12);
 
-  const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(3.4, 24, 16, 0, Math.PI * 2, 0, Math.PI * 0.5),
-    whiteMat
-  );
-  dome.position.set(0, 2.48, 0);
-  hab.add(dome);
+  // Dos módulos cilíndricos pequeños con remates curvos, unidos al núcleo.
+  for (const side of [-1, 1]) {
+    const connector = tube(hab, .46, .78, trim, side * 1.56, 1.38, -.12, 16);
+    connector.rotation.z = Math.PI / 2;
+    const inner = tube(hab, .39, .82, dark, side * 1.56, 1.38, -.12, 16);
+    inner.rotation.z = Math.PI / 2;
 
-  /* Esclusa de aire frontal (Airlock EVA) con baliza verde de acceso seguro */
-  const airlock = new THREE.Mesh(new THREE.BoxGeometry(1.8, 2.1, 2.2), metalMat);
-  airlock.position.set(0, 1.25, 3.6);
-  hab.add(airlock);
+    const pod = new THREE.Group();
+    pod.position.set(side * 3.03, 1.27, -.12);
+    pod.rotation.y = side * Math.PI / 2;
+    hab.add(pod);
+    const barrel = tube(pod, .82, 1.9, shell, 0, 0, 0, 20);
+    barrel.rotation.x = Math.PI / 2;
+    for (const z of [-.95, .95]) {
+      const cap = part(pod, new THREE.SphereGeometry(.82, 18, 10), shell, 0, 0, z);
+      cap.scale.z = .53;
+    }
+    for (const z of [-.78, 0, .78]) {
+      const hoop = part(pod, new THREE.TorusGeometry(.83, .025, 6, 24), copper, 0, 0, z);
+      hoop.name = 'pressureHoop';
+    }
+    for (const z of [-.4, .4]) {
+      const window = box(pod, [.045, .27, .33], glass, .82, .12, z);
+      window.rotation.z = -.08;
+      const opposite = box(pod, [.045, .27, .33], glass, -.82, .12, z);
+      opposite.rotation.z = .08;
+    }
+    for (const z of [-.65, .65]) {
+      for (const x of [-.5, .5]) {
+        beam(pod, [x, -.55, z], [x * 1.12, -1.2, z], .055, trim);
+        box(pod, [.27, .06, .2], dark, x * 1.12, -1.22, z);
+      }
+    }
+    box(pod, [.68, .045, 1.3], dark, 0, .83, 0);
+  }
 
-  const doorGlow = new THREE.Mesh(new THREE.PlaneGeometry(0.95, 1.65), greenLightMat);
-  doorGlow.position.set(0, 1.15, 4.72);
-  hab.add(doorGlow);
-
-  /* Luz guía de la esclusa (ilumina el umbral de entrada por la noche) */
-  const airlockLight = new THREE.PointLight(0x55f29b, 1.2, 16, 1.8);
-  airlockLight.position.set(0, 2.1, 4.9);
+  // Esclusa frontal con luz de acceso y rampa corta.
+  box(hab, [1.25, 1.45, 1.38], shell, 0, 1.17, 2.01);
+  box(hab, [1.28, .12, 1.4], trim, 0, 1.89, 2.01);
+  box(hab, [.88, 1.23, .055], dark, 0, 1.13, 2.73);
+  box(hab, [.68, 1.05, .06], glass, 0, 1.13, 2.77);
+  box(hab, [.72, .065, .07], entry, 0, 1.77, 2.79);
+  const ramp = box(hab, [.9, .06, .84], trim, 0, .3, 3.08);
+  ramp.rotation.x = -.24;
+  const airlockLight = new THREE.PointLight(0x72edbd, .8, 6, 1.8);
+  airlockLight.position.set(0, 1.83, 2.84);
   hab.add(airlockLight);
 
-  /* Ventanas iluminadas del hábitat */
-  for (const ang of [-0.7, 0.7, 2.1, -2.1]) {
-    const win = new THREE.Mesh(new THREE.BoxGeometry(0.75, 0.42, 0.12), windowMat);
-    win.position.set(Math.sin(ang) * 3.38, 1.85, Math.cos(ang) * 3.38);
-    win.rotation.y = ang;
-    hab.add(win);
-  }
-
-  /* 2 matrices de paneles solares laterales */
+  // Paneles solares detrás de la estación, sin ampliar la huella lateral.
   for (const side of [-1, 1]) {
-    const wing = new THREE.Mesh(new THREE.BoxGeometry(3.6, 0.08, 1.8), solarMat);
-    wing.position.set(side * 5.4, 1.15, -0.5);
-    wing.rotation.x = 0.28;
-    hab.add(wing);
-
-    const support = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.15, 8), metalMat);
-    support.position.set(side * 4.2, 0.6, -0.5);
-    hab.add(support);
+    const x = side * 2.13;
+    box(hab, [2.18, .055, .85], dark, x, 1.15, -2.2);
+    box(hab, [2.03, .012, .72], solar, x, 1.19, -2.2);
+    for (const stripe of [-.54, 0, .54]) {
+      box(hab, [.02, .014, .72], trim, x + stripe, 1.2, -2.2);
+    }
+    beam(hab, [x, 1.1, -2.2], [x, .12, -2.2], .045, trim);
   }
 
-  /* Antena parabólica de enlace Tierra-Marte sobre el domo */
-  const commsPole = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 1.4, 8), metalMat);
-  commsPole.position.set(-1.1, 5.8, -0.8);
-  hab.add(commsPole);
-
-  const commsDish = new THREE.Mesh(new THREE.ConeGeometry(0.85, 0.45, 16, 1, true), whiteMat);
-  commsDish.position.set(-1.1, 6.55, -0.8);
-  commsDish.rotation.x = Math.PI * 0.72;
-  hab.add(commsDish);
+  // Antena y baliza de comunicaciones sobre el núcleo.
+  beam(hab, [-.44, 3.3, -.24], [-.44, 4.04, -.24], .035, trim);
+  const dish = tube(hab, .35, .05, shell, -.44, 4.03, -.24, 20);
+  dish.rotation.x = -.42;
+  tube(hab, .065, .08, copper, -.44, 4.07, -.24, 10);
+  beam(hab, [.45, 3.36, -.17], [.45, 4.12, -.17], .018, trim);
+  part(hab, new THREE.SphereGeometry(.065, 8, 6), entry, .45, 4.15, -.17);
 
   return hab;
 }
-
 /**
  * Construye un Depósito de Tubos de Muestra de Titanio (estilo Three Forks Sample Depot) + Trípode Espectrómetro.
  */

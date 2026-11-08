@@ -12,7 +12,7 @@ const material=(color,metalness=0)=>new T.MeshStandardMaterial({color,roughness:
 const cream=material(0xe9e3da), ink=material(0x293342), orange=material(0xd67852), brass=material(0xe7bd87,.25);
 let active=false,playing=false,elapsed=0,lastFrame=0,elapsedTotal=0,ready=false;
 let scene,camera,renderer,earthGroup,marsGroup,solarGroup,fpTerrain,explorer,actor,rocket,route,solarRocket,dust,outerStars;
-let audioContext,audioMaster,musicLoop,prevPhase='',savedFocus,savedOrbit,siblings=[];
+let audioContext,audioMaster,musicLoop,prevPhase='',prevEarthBeat='',savedFocus,savedOrbit,siblings=[];
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const duration=33;
 
@@ -53,9 +53,16 @@ function makeRocket(parent){
  add(root,new T.CylinderGeometry(.15,.15,.25,16),ink,0,-.02);
  for(let i=0;i<4;i++){const a=i*Math.PI/2;const fin=add(root,new T.BoxGeometry(.13,.7,.58),orange,Math.sin(a)*.29,.48,Math.cos(a)*.29);fin.rotation.y=a}
  for(const y of [.7,1.68]){const stripe=add(root,new T.TorusGeometry(.29,.025,5,28),brass,0,y);stripe.rotation.x=Math.PI/2}
- add(root,new T.SphereGeometry(.14,14,10),ink,0,1.57,.275);
+ add(root,new T.SphereGeometry(.12,14,10),ink,0,1.83,.275);
+ // Escotilla frontal y escalones: el personaje entra en el mismo volumen que despega.
+ add(root,new T.BoxGeometry(.51,.84,.055),ink,0,1.12,.352);
+ add(root,new T.BoxGeometry(.43,.76,.065),ink,0,1.12,.392);
+ const hatchDoor=add(root,new T.BoxGeometry(.43,.76,.065),cream,0,1.12,.435);
+ add(hatchDoor,new T.BoxGeometry(.26,.085,.012),orange,0,.19,.038);
+ const steps=new T.Group();root.add(steps);steps.visible=false;
+ for(let i=0;i<3;i++)add(steps,new T.BoxGeometry(.43,.055,.24),ink,0,.18+i*.18,1.0-i*.22);
  const nozzle=add(root,new T.ConeGeometry(.16,.8,10),new T.MeshBasicMaterial({color:0xffb660,transparent:true,opacity:.95}),0,-.42);nozzle.rotation.z=Math.PI;nozzle.visible=false;
- return {root,nozzle};
+ return {root,nozzle,hatchDoor,steps};
 }
 function globe(group,x,r,color,accent){
  const main=add(group,new T.SphereGeometry(r,24,16),material(color),x,0,0);
@@ -76,7 +83,7 @@ function makeSolar(){
  route=new T.CatmullRomCurve3(points);
  const routeLine=new T.Line(new T.BufferGeometry().setFromPoints(route.getPoints(150)),new T.LineDashedMaterial({color:0xf9b68e,dashSize:.1,gapSize:.09,transparent:true,opacity:.85}));routeLine.computeLineDistances();solarGroup.add(routeLine);
  const marker=add(solarGroup,new T.SphereGeometry(.08,12,8),new T.MeshBasicMaterial({color:0xffe9b2}),-3.1,.3,1.25);marker.name='route-marker';
- solarRocket=makeRocket(solarGroup);solarRocket.root.scale.setScalar(.38);solarRocket.root.position.copy(points[0]);solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
+ solarRocket=makeRocket(solarGroup);solarRocket.root.scale.setScalar(.46);solarRocket.root.position.copy(points[0]);solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
  const labelMaterial=new T.MeshBasicMaterial({color:0xf6d1b1});
  for(const [x,r] of [[-6.2,1.35],[-3.1,.78],[3.2,.65]]){const ring=add(solarGroup,new T.TorusGeometry(r,.008,4,60),labelMaterial,x,0);ring.rotation.x=Math.PI/2}
 }
@@ -107,7 +114,7 @@ function initWorld(){
  earthGroup=new T.Group();scene.add(earthGroup);circleTerrain(earthGroup,true);
  marsGroup=new T.Group();scene.add(marsGroup);circleTerrain(marsGroup,false);
  makeSolar();makeFpTerrain();makeParticles();
- rocket=makeRocket(scene);rocket.root.position.set(1.1,.15,-.2);
+ rocket=makeRocket(scene);rocket.root.scale.setScalar(1.45);rocket.root.position.set(1.1,.15,-.2);
  explorer=createExplorer();actor=new T.Group();actor.position.set(-1.5,0,.35);actor.add(explorer.root);scene.add(actor);
  const grid=new T.GridHelper(40,40,0x5d6970,0x40505d);grid.position.y=-.24;scene.add(grid);
  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
@@ -125,9 +132,9 @@ function audioOn(){
 function tone(f,d=.3,volume=.12,type='sine'){if(!audioContext)return;const t=audioContext.currentTime,o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(type==='sawtooth')o.frequency.exponentialRampToValueAtTime(f*2,t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(audioMaster);o.start(t);o.stop(t+d+.02)}
 function syncAudioLabel(){const on=audioContext&&audioMaster.gain.value>0;el('signal-sound').textContent=on?'♪ SONIDO ACTIVADO':'♪ ACTIVAR SONIDO';el('signal-sound').setAttribute('aria-pressed',String(!!on))}
 function setText(chapter,title,sub,hint){el('signal-kicker').textContent=chapter;el('signal-title').textContent=title;el('signal-subtitle').textContent=sub;el('signal-hint').textContent=hint}
-function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
+function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
 function finish(){if(ready)return;ready=true;playing=false;ui.classList.add('is-ready');setText('04 / SUPERFICIE MARCIANA','EL NUEVO HORIZONTE','El terreno te espera. Continúa al mapa para explorar.','VISOR EVA ACTIVO · SUPERFICIE DISPONIBLE');el('signal-continue').hidden=false;el('signal-skip').hidden=true;el('signal-continue').focus({preventScroll:true});tone(392,.6,.06)}
-function reset(){playing=false;ready=false;elapsed=0;prevPhase='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;el('signal-skip').hidden=false;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
+function reset(){playing=false;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;el('signal-skip').hidden=false;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
 function phaseUpdate(phase){
  if(phase===prevPhase)return;prevPhase=phase;ui.dataset.phase=phase;
  if(phase==='earth')setText('01 / TIERRA','EL PRIMER PASO','El astronauta se dirige al cohete.','RUMBO A MARTE · PREPARANDO DESPEGUE');
@@ -145,22 +152,55 @@ function frame(now){
  outerStars.visible=inSolar;dust.visible=!inSolar;
  scene.background.setHex(inSolar?0x100f20:inEarth?0x1a2430:0x35232b);
  scene.fog.color.copy(scene.background);
- const walk=ease((t-1)/3.4),launch=ease((t-4.8)/3.1),travel=ease((t-8)/9),land=ease((t-17)/5.5),exit=ease((t-22)/3);
+ const launch=ease((t-5.85)/2.15),travel=ease((t-8)/9),land=ease((t-17)/5.5);
  if(inEarth){
-  actor.visible=t<5.15;if(t<4.4)explorer.pose(Math.min(3.6,Math.max(0,t-1)),'walk');else explorer.pose(elapsedTotal,'idle');actor.position.set(mix(-1.5,-.3,walk),0,.35);actor.rotation.y=-.65;
-  rocket.root.visible=true;rocket.root.position.set(1.1,.15+launch*13,-.2);rocket.root.rotation.set(0,0,-launch*.18);rocket.nozzle.visible=t>4.8;
-  camera.position.set(5.5+launch*.7,5.4+launch*1.2,9+launch*1.6);camera.lookAt(0,.65+launch*1.8,0);
+  const approach=ease((t-1.2)/2.25),board=ease((t-4.05)/1.5);
+  const facing=ease((t-.35)/.95),toHatch=ease((t-3.35)/.65);
+  const doorOpen=ease((t-3.3)/.45)*(1-ease((t-5.35)/.42));
+  actor.visible=t<5.55;
+  actor.position.set(mix(-1.5,1.1,approach),mix(0,.62,board),mix(.35,1.24,approach)-1.04*board);
+  actor.rotation.y=mix(0,Math.PI/2,facing)+Math.PI/2*toHatch;
+  actor.scale.setScalar(mix(1,.68,board));
+  const gait=ease((t-1.05)/.35)*(1-ease((t-3.2)/.42))
+   +ease((t-3.9)/.25)*(1-ease((t-5.24)/.24));
+  const turn=(ease((t-.35)/.95)-ease((t-1.3)/.35))
+   +(ease((t-3.35)/.65)-ease((t-4.0)/.3));
+  explorer.pose(Math.max(0,t-1.05)*4.6,'locomotion',clamp(gait),0,clamp(turn));
+  rocket.root.visible=true;
+  rocket.root.position.set(1.1,.15+launch*13,-.2);
+  rocket.root.rotation.set(0,0,-launch*.18);
+  rocket.hatchDoor.position.x=.55*doorOpen;
+  rocket.steps.visible=doorOpen>.015;
+  rocket.nozzle.visible=t>5.85;
+  const beat=t<3.35?'camino':t<5.55?'abordaje':'despegue';
+  if(beat!==prevEarthBeat&&playing){prevEarthBeat=beat;
+   if(beat==='abordaje'){setText('01 / TIERRA','A BORDO','El astronauta gira y sube al cohete.','ESCOTILLA ABIERTA · SISTEMAS LISTOS');tone(390,.22,.045)}
+   if(beat==='despegue'){setText('01 / TIERRA','DESPEGUE','La misión deja atrás la Tierra.','TRAYECTORIA A MARTE INICIADA');tone(78,1.8,.08,'sawtooth')}
+  }
+  camera.position.set(5.8+launch*.7,5.5+launch*1.2,9.6+launch*1.6);
+  camera.lookAt(.15,.92+launch*1.8,0);
  }else if(inSolar){
   actor.visible=false;rocket.root.visible=false;solarRocket.root.position.copy(route.getPoint(travel));solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
   solarGroup.children.find(c=>c.name==='route-marker').position.copy(route.getPoint(travel));
   camera.position.set(0,4.7,15.5);camera.lookAt(-1,.25,0);
  }else if(inMars){
-  marsGroup.scale.setScalar(1+land*.1);actor.visible=t>22;explorer.pose(Math.max(0,t-22),'walk');actor.position.set(mix(1.2,.05,exit),0,.2);actor.rotation.y=-.8;
-  rocket.root.visible=true;rocket.root.position.set(1.35, .15+(1-land)*5.5,-.2);rocket.root.rotation.set(0,0,(1-land)*.14);rocket.nozzle.visible=t<22;
+  const open=ease((t-21.35)/.6)*(1-ease((t-25.35)/.5));
+  const emerge=ease((t-22.05)/1.15),leave=ease((t-23.15)/2.65);
+  marsGroup.scale.setScalar(1+land*.1);
+  actor.visible=t>22.05;
+  actor.position.set(mix(1.35,.05,leave),mix(.62,0,emerge),mix(.08,1.24,emerge)-1.04*leave);
+  actor.rotation.y=Math.PI+Math.PI/2*ease((t-23.0)/.7);
+  actor.scale.setScalar(mix(.68,1,emerge));
+  const gait=ease((t-22.08)/.25)*(1-ease((t-25.55)/.35));
+  explorer.pose(Math.max(0,t-22.08)*4.6,'locomotion',gait,0,ease((t-23.0)/.7)*(1-ease((t-23.7)/.3)));
+  rocket.root.visible=true;rocket.root.position.set(1.35,.15+(1-land)*5.5,-.2);rocket.root.rotation.set(0,0,(1-land)*.14);
+  rocket.hatchDoor.position.x=.55*open;rocket.steps.visible=open>.015;
+  rocket.nozzle.visible=t<22;
   camera.position.set(mix(5.5,4.1,land),mix(7.3,3.2,land),mix(10,7.5,land));camera.lookAt(0,mix(1.8,.65,land),0);
  }else{
   rocket.root.visible=t<30;actor.visible=t<30;
-  explorer.pose(elapsedTotal,'idle');actor.position.set(.05,0,.2);actor.rotation.y=0;
+  rocket.hatchDoor.position.x=0;rocket.steps.visible=false;
+  explorer.pose(elapsedTotal,'idle');actor.position.set(.05,0,.2);actor.rotation.y=Math.PI*1.5;actor.scale.setScalar(1);
   const toward=ease((t-26)/3.6);
   marsGroup.scale.setScalar(1+ease((t-26)/3.1)*6);
   const from=V(3.8,3.1,6.4),to=V(.05,1.7,.45);camera.position.copy(from.lerp(to,toward));
