@@ -2816,6 +2816,13 @@ body.fp .hint {
   text-shadow: 0 0 3px #000, 0 0 3px #000;
 }
 
+.suit-lab-btn {
+  width: 100%;
+  margin-top: 8px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
 /* ------------------------------------------------------------------ Tripulación (F2) */
 /* HUD de grupo: cabecera y filas en dos líneas para que quepan nombres y métricas */
 .group-status-panel {

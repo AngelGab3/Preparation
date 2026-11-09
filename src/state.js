@@ -27,6 +27,7 @@ export const state = {
   },
   health: null,          // se inicializa en main.js tras cargar config_health.json
   healthMode: 'solo',    // 'solo' | 'group'
+  suitLabOpen: false,    // sección Traje EVA abierta → se pausa el bucle del mapa
   crew: [],              // tripulación editable (miembro 0 = jugador); ver crew.js
   healthCfgOverrides: {},// overrides de config_health.json del dataset (sin members)
   healthLastAggregate: null,

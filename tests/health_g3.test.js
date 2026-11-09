@@ -174,3 +174,33 @@ test('ruta: penalización fuerte sobre el límite y peor estado del recorrido', 
     assert.equal(worseStatus('nominal', 'elevated'), 'elevated');
     assert.equal(worseStatus('critical', 'nominal'), 'critical');
 });
+
+test('catálogo: los 4 trajes son válidos y cambian el modelo', async () => {
+    const { SUIT_IDS, tankPressureKpa } = await import('../src/suits.js');
+    assert.deepEqual(SUIT_IDS, ['xemu', 'axemu', 'emu', 'orlan']);
+    const member = { body_mass_kg: 80, age_years: 40, fitness_level: 'fit', sex: 'male' };
+    const pace = {};
+    for (const id of SUIT_IDS) {
+        const suit = getSuit(id);
+        assert.equal(suit.id, id);
+        assert.ok(suit.total_mass_kg > 50 && suit.operating_pressure_kpa > 20 && suit.o2_primary_l_equiv > 100);
+        assert.ok(suit.sources.length >= 2);
+        const ids = suit.components.map((c) => c.id);
+        for (const need of ['helmet', 'plss', 'torso', 'dcu', 'gloves', 'lower', 'boots', 'lcvg']) assert.ok(ids.includes(need), `${id} tiene ${need}`);
+        for (const c of suit.components) for (const sp of c.specs) assert.ok(['publicado', 'estimado'].includes(sp.conf));
+        if (suit.co2_removal === 'cartridge') assert.ok(suit.co2_capacity_l > 0);
+        const cfg = resolveHealthConfig({ suit_id: id });
+        assert.equal(cfg.suit_true_mass_kg, suit.total_mass_kg);
+        assert.equal(cfg.o2_capacity_l_equiv, suit.o2_primary_l_equiv);
+        pace[id] = sustainableSpeedMs(resolveMember(member, cfg), cfg, 3);
+        assert.equal(tankPressureKpa(suit, suit.o2_primary_l_equiv / 2, suit.o2_primary_l_equiv), suit.o2_primary_pressure_kpa / 2);
+    }
+    /* Los trajes de microgravedad obligan a ir más lento que los de superficie */
+    assert.ok(pace.axemu >= pace.xemu);
+    assert.ok(pace.emu < pace.xemu && pace.orlan < pace.xemu);
+    /* El EMU satura su cartucho de CO₂ en una EVA larga; el xEMU no */
+    const seg = { walking_time_h: 7, slope_deg: 0, surface_distance_m: 9000, walk_speed_ms: 0.4 };
+    const run = (id) => { const cfg = resolveHealthConfig({ suit_id: id }); const m = resolveMember(member, cfg); return advanceMemberState(seg, initMemberState(m, cfg), m, cfg); };
+    assert.ok(run('emu').co2_cartridge_used_frac > 0.85);
+    assert.equal(run('xemu').co2_cartridge_used_frac, 0);
+});

@@ -21,6 +21,7 @@ import { initMobileTabs } from './mobile_tabs.js';
 import { loadHealthModePreference } from './health_group.js';
 import { loadCrew, sanitizeCrew, generateCrew, makeRng, buildHealthFromCrew } from './crew.js';
 import { initCrewUI } from './crew_ui.js';
+import { loadSuitPreference } from './suits.js';
 import { syncCrewFollowers, tickCrewFollowers } from './crew_followers.js';
 
 async function loadConfigHealth(datasetId) {
@@ -39,6 +40,9 @@ async function initHealthState() {
   delete cfgOverrides.members;
   delete cfgOverrides.dataset_id;
   delete cfgOverrides.note;
+  /* El traje elegido por el usuario gana sobre el del dataset */
+  const savedSuit = loadSuitPreference();
+  if (savedSuit) cfgOverrides.suit_id = savedSuit;
   state.healthCfgOverrides = cfgOverrides;
 
   /* Tripulación: la guardada por el usuario > la del dataset > una generada */
@@ -50,6 +54,23 @@ async function initHealthState() {
   console.log('[MarsWalk] Health inicializado:', state.health.mode, state.health.members.length, 'miembro(s)');
 }
 
+
+/* La sección "Traje EVA" (modelo 3D + tablas) va en un chunk aparte que se descarga al primer clic */
+function initSuitLabButton() {
+  const btn = document.getElementById('suit-lab-btn');
+  if (!btn) return;
+  btn.addEventListener('click', async () => {
+    btn.disabled = true;
+    try {
+      const { openSuitLab } = await import('./suit_lab.js');
+      openSuitLab();
+    } catch (err) {
+      console.error('[MarsWalk] No se pudo cargar la sección Traje:', err);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+}
 
 const clock = new THREE.Clock();
 
@@ -67,6 +88,7 @@ const clock = new THREE.Clock();
   await initHealthState();
   initCrewUI();
   syncCrewFollowers();
+  initSuitLabButton();
   /* 3. Inicializar astronauta (dock + drag) */
   initAstronaut();
 
@@ -90,6 +112,9 @@ function animate() {
   requestAnimationFrame(animate);
   const frameDelta_s = clock.getDelta();
   const dt = Math.min(frameDelta_s, 0.05);
+
+  /* Con la sección Traje abierta el mapa queda tapado: no se simula ni se dibuja */
+  if (state.suitLabOpen) return;
 
   if (isIntroCinematicActive()) {
     tickIntroCinematic(frameDelta_s);

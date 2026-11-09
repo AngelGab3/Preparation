@@ -17,6 +17,9 @@ Proyecto para el reto *Interplanetary Survival Guide: Martian Map* — NASA Spac
 | Moverse con seguridad | Rutas óptimas A\* y QAOA que evitan pendientes > 25°, perfil de elevación y estimación de O₂ |
 | Conocer las condiciones actuales | Sol, temperatura, viento y polvo (MEDA), simulación de tormenta y evacuación a refugio |
 | Ver el lugar antes de llegar | Vista en 1ª/3ª persona con visor EVA: oxígeno, pulso, brújula y mini-radar |
+| Saber si el cuerpo aguanta | Modelo de salud por astronauta (VO₂máx por edad, sexo y condición; FC, O₂, CO₂, temperatura, hidratación y radiación RAD) que fija el ritmo sostenible y el coste de la ruta |
+| Salir en equipo | Tripulación de 1 a 6 astronautas editable (panel **Tripulación**): el grupo camina al paso del más limitado y los compañeros te siguen en 3D |
+| Entender el traje | Sección **Traje EVA**: modelo 3D con piezas clickeables, cuatro trajes (xEMU, AxEMU, EMU, Orlan-MKS), tanques y presiones en vivo, Marte vs Tierra y las fórmulas usadas |
 
 ## Inicio rápido
 
@@ -55,6 +58,7 @@ Abre `http://localhost:8000/`. Parámetros útiles:
 **Exploración en superficie**
 - `W A S D` / flechas: caminar (1.2 m/s) · `Shift`: correr (2.5 m/s) · `Espacio`: saltar (g = 3.71 m/s²).
 - `V`: alternar 1ª / 3ª persona · `E`: analizar · `Esc`: volver a la vista orbital.
+- `G` pliega o despliega el panel de estado del grupo.
 
 ## Datos
 
