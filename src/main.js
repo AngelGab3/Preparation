@@ -18,7 +18,10 @@ import { initTerrainFX, updateTerrainFX } from './terrain_fx.js';
 import { tickOrbitBackdrop, tickOrbitFill } from './orbit_backdrop.js';
 import { initStats, tickStats } from './stats.js';
 import { initMobileTabs } from './mobile_tabs.js';
-import { createSoloHealth, createGroupHealth, loadHealthModePreference } from './health_group.js';
+import { loadHealthModePreference } from './health_group.js';
+import { loadCrew, sanitizeCrew, generateCrew, makeRng, buildHealthFromCrew } from './crew.js';
+import { initCrewUI } from './crew_ui.js';
+import { syncCrewFollowers, tickCrewFollowers } from './crew_followers.js';
 
 async function loadConfigHealth(datasetId) {
   try {
@@ -31,19 +34,19 @@ async function loadConfigHealth(datasetId) {
 }
 
 async function initHealthState() {
-  const mode = loadHealthModePreference();
   const raw = await loadConfigHealth(state.datasetId || CONFIG.DEFAULT_DATASET);
   const cfgOverrides = raw ? { ...raw } : {};
   delete cfgOverrides.members;
   delete cfgOverrides.dataset_id;
   delete cfgOverrides.note;
+  state.healthCfgOverrides = cfgOverrides;
 
-  if (mode === 'group' && raw?.members) {
-    state.health = createGroupHealth(raw.members, cfgOverrides);
-  } else {
-    state.health = createSoloHealth(cfgOverrides);
-  }
-  state.healthMode = state.health.mode;
+  /* Tripulación: la guardada por el usuario > la del dataset > una generada */
+  const saved = loadCrew();
+  const fromDataset = sanitizeCrew(raw?.members || []);
+  state.crew = saved || (fromDataset.length ? fromDataset : generateCrew(3, makeRng(2026)));
+  state.healthMode = loadHealthModePreference() === 'group' && state.crew.length > 1 ? 'group' : 'solo';
+  state.health = buildHealthFromCrew(state.healthMode, state.crew, cfgOverrides);
   console.log('[MarsWalk] Health inicializado:', state.health.mode, state.health.members.length, 'miembro(s)');
 }
 
@@ -62,6 +65,8 @@ const clock = new THREE.Clock();
   initTerrainFX();
   benchmarkGroundSampling(200);
   await initHealthState();
+  initCrewUI();
+  syncCrewFollowers();
   /* 3. Inicializar astronauta (dock + drag) */
   initAstronaut();
 
@@ -97,6 +102,7 @@ function animate() {
   tickPopup();
   tickRouteAnimation(dt);
   tickArtifactsAnimation(dt, clock.elapsedTime);
+  tickCrewFollowers(dt);
   updateSolarCycle(dt);
 
   tickOrbitFill();

@@ -14,8 +14,9 @@ import { spawnAstronaut, updateAstronautThirdPersonVisuals, restoreAstronautOrbi
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
 import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio, triggerRoverFunFact, toggleCopilotVoice, tickRoverCompanionFacts } from './copilot.js';
 /* === G1 === */
-import { advanceGroupState, aggregateGroupState, createSoloHealth } from './health_group.js';
+import { advanceGroupState, aggregateGroupState, createSoloHealth, groupSustainablePace } from './health_group.js';
 import { computeHealthAwareRoute, compareRoutes, PRESETS } from './health_route_astar.js';
+import { ROLES } from './crew.js';
 const modeBtn = document.getElementById('mode-btn');
 const viewToggleBtn = document.getElementById('view-toggle-btn');
 const hintEl = document.querySelector('.hint');
@@ -185,6 +186,10 @@ export function initControls() {
       if (e.code === 'KeyU' && !e.repeat) {
         e.preventDefault();
         toggleCopilotVoice();
+      }
+      if (e.code === 'KeyG' && !e.repeat) {
+        e.preventDefault();
+        toggleGroupPanel();
       }
       /* === G2 === */
       if (e.code === 'KeyM' && !e.repeat) {
@@ -650,6 +655,19 @@ function renderHUD() {
 }
 
 /* === G1 + G2: render del panel GROUP_STATUS con throttle a 5 Hz === */
+const GROUP_STATUS_LABEL = {
+  nominal: 'NOMINAL', low_o2: 'O₂ BAJO', elevated: 'ESFUERZO ALTO',
+  at_risk_over_sustainable: 'SOBRE EL LÍMITE', critical: 'CRÍTICO',
+};
+let groupPanelCollapsed = false;
+try { groupPanelCollapsed = localStorage.getItem('marswalk_group_panel') === 'collapsed'; } catch { /* sin almacenamiento */ }
+
+function toggleGroupPanel() {
+  groupPanelCollapsed = !groupPanelCollapsed;
+  try { localStorage.setItem('marswalk_group_panel', groupPanelCollapsed ? 'collapsed' : 'open'); } catch { /* sin almacenamiento */ }
+  renderGroupHUD._lastMs = 0;
+}
+
 function renderGroupHUD() {
   const nowMs = performance.now();
   if (nowMs - (renderGroupHUD._lastMs || 0) < 200) return;
@@ -667,10 +685,38 @@ function renderGroupHUD() {
   }
   panel.hidden = false;
 
+  /* Se ancla justo debajo del bloque de controles (cambia de sitio entre 1ª y 3ª persona)
+   * y nunca baja hasta los instrumentos de la esquina inferior derecha. */
+  const ctrlRect = document.querySelector('.controls')?.getBoundingClientRect();
+  const bottomRect = document.querySelector('.hud-bottom-right')?.getBoundingClientRect();
+  if (ctrlRect && ctrlRect.width > 0) {
+    const top = Math.round(ctrlRect.bottom + 8);
+    panel.style.top = `${top}px`;
+    panel.style.right = `${Math.round(window.innerWidth - ctrlRect.right)}px`;
+    const limit = bottomRect && bottomRect.top > top ? bottomRect.top : window.innerHeight;
+    panel.style.maxHeight = `${Math.max(40, Math.round(limit - top - 12))}px`;
+  }
+  panel.classList.toggle('collapsed', groupPanelCollapsed);
+
   const agg = state.healthLastAggregate;
   const leaderIdx = agg.leaderIndex;
   const modeLabel = agg.mode === 'solo' ? 'SOLO' : `GROUP · ${agg.members.length} · ROT ${agg.totalRotations}`;
-  metaEl.textContent = `${modeLabel} · leader: ${agg.leaderId ?? '—'}`;
+  const nameOf = (id) => { const mm = agg.members.find((x) => x.id === id); return mm?.name || id || '—'; };
+  /* Ritmo que el miembro más limitado sostiene en la pendiente actual (el grupo no deja a nadie atrás) */
+  const slopeNow = state.astronautPosition ? (sampleSlopeDeg(state.astronautPosition.x, state.astronautPosition.z) ?? 0) : 0;
+  const pace = groupSustainablePace(state.health, slopeNow);
+  const paceTxt = pace.binding_member_id
+    ? `ritmo ≤ ${pace.pace_ms.toFixed(2)} m/s (limita ${nameOf(pace.binding_member_id)})`
+    : `ritmo ${pace.pace_ms.toFixed(2)} m/s`;
+  if (groupPanelCollapsed) {
+    const o2Pct = Math.min(...agg.members.map((m) => (m.o2_capacity_l_equiv ? m.o2_remaining_l / m.o2_capacity_l_equiv : 1))) * 100;
+    metaEl.textContent = `${agg.mode === 'solo' ? 'SOLO' : `GRUPO · ${agg.members.length}`} · ${GROUP_STATUS_LABEL[agg.status] || agg.status} · O₂ mín ${o2Pct.toFixed(0)}%`;
+    metaEl.className = `group-status-meta status-${agg.status}`;
+    listEl.innerHTML = '';
+    return;
+  }
+  metaEl.className = 'group-status-meta';
+  metaEl.textContent = agg.mode === 'solo' ? `${modeLabel} · ${paceTxt}` : `${modeLabel} · abre: ${nameOf(agg.leaderId)} · ${paceTxt}`;
 
   listEl.innerHTML = agg.members.map((m, idx) => {
     const isLeader = idx === leaderIdx;
@@ -686,7 +732,7 @@ function renderGroupHUD() {
     const dose = typeof m.dose_usv === 'number' ? `${m.dose_usv.toFixed(1)}µSv` : '—';
     return `<div class="group-member ${statusClass} ${isLeader ? 'leader' : ''}">
       <span class="member-role">${roleTag}</span>
-      <span class="member-id">${m.name || m.id}</span>
+      <span class="member-id">${m.name || m.id}${ROLES[m.role] ? ` <small>${ROLES[m.role].short}</small>` : ''}</span>
       <span class="member-metric" title="O₂ restante · autonomía · FC · metabolismo (esfuerzo vs sostenible) · T núcleo · deshidratación · dosis GCR">O₂ ${m.o2_remaining_l.toFixed(0)}L (${autonomy}) · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W ${effort} · ${tCore} · ${hyd} · ${dose}</span>
     </div>`;
   }).join('');
@@ -945,7 +991,7 @@ function updateUI() {
       : '🎥 Vista: 1ª Persona [V]';
   }
   hintEl.textContent = isFP
-    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
+    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · G = Panel de grupo · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
   document.body.classList.toggle('helmet-view', isFP && !state.fpThirdPerson);
