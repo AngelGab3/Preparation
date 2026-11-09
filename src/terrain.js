@@ -8,6 +8,8 @@ import { sampleDemHeightRelM, sampleSlopeDeg, sampleGroundY, getSlopeCostFactor 
 import { buildHumanScalePOIArtifactGroup, clearAnimatedArtifactsRegistry } from './artifacts3d.js';
 import { computeHealthOptimalRoute } from './health_route.js';
 let detailBumpTexture = null;
+let horizonMesh = null;
+let horizonHeights = null;
 let compositeCanvas = null;
 let compositeCtx = null;
 let compositeTexture = null;
@@ -719,6 +721,10 @@ export function buildTerrain(metadata, demFloat32, texture) {
     state.localPatchMesh.material.map = texture || null;
     state.localPatchMesh.material.needsUpdate = true;
   }
+  if (horizonMesh) {
+    horizonMesh.material.map = texture || null;
+    horizonMesh.material.needsUpdate = true;
+  }
 
   applyHeights(state.exaggeration);
   state.terrainMesh.updateMatrixWorld(true);
@@ -973,7 +979,7 @@ export function applyWeatherAtmosphere() {
       if (isFP) {
         /* En 1ª persona, niebla en el horizonte fundida con el tono butterscotch marciano */
         const butterscotchHex = 0xdca678;
-        scene.fog = new THREE.Fog(butterscotchHex, halfPatch_m * 0.55, halfPatch_m * 1.45);
+        scene.fog = new THREE.Fog(butterscotchHex, halfPatch_m * 1.2, halfPatch_m * 6.0);
         renderer.setClearColor(butterscotchHex, 1);
       } else {
         scene.fog = new THREE.Fog(0x0b0d10, dim_m * 1.1, dim_m * 2.8);
@@ -1021,7 +1027,7 @@ export function applyWeatherAtmosphere() {
 
     const twSkyHex = isStorm ? 0x3b1910 : 0x241d2d;
     if (isFP) {
-      scene.fog = new THREE.Fog(twSkyHex, halfPatch_m * 0.45, halfPatch_m * 1.35);
+      scene.fog = new THREE.Fog(twSkyHex, halfPatch_m * 0.85, halfPatch_m * 3.8);
       renderer.setClearColor(twSkyHex, 1);
     } else {
       scene.fog = new THREE.Fog(0x0d1018, dim_m * 1.0, dim_m * 2.7);
@@ -1068,7 +1074,7 @@ export function applyWeatherAtmosphere() {
     }
 
     scene.fog = isFP
-      ? new THREE.Fog(0x05070b, halfPatch_m * 0.48, halfPatch_m * 1.35)
+      ? new THREE.Fog(0x05070b, halfPatch_m * 0.7, halfPatch_m * 2.8)
       : new THREE.Fog(0x05070b, dim_m * 1.1, dim_m * 2.8);
     renderer.setClearColor(0x05070b, 1);
 
@@ -1321,6 +1327,85 @@ function getDetailBumpTexture() {
   return detailBumpTexture;
 }
 
+const HORIZON_SCALES = [1, 1.15, 1.35, 1.6, 1.9, 2.3, 2.8, 3.4, 4.1, 5, 6];
+const HORIZON_SIDE_STEPS = 64;
+const HORIZON_RING_POINTS = HORIZON_SIDE_STEPS * 4;
+
+function ensureHorizonCreated() {
+  if (horizonMesh) return;
+  const count = HORIZON_SCALES.length * HORIZON_RING_POINTS;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(count * 3), 3));
+  geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(count * 2), 2));
+  const colors = new Float32Array(count * 3);
+  const warm = new THREE.Color(0xd5a17c);
+  for (let ring = 0; ring < HORIZON_SCALES.length; ring++) {
+    const tint = new THREE.Color(0xffffff).lerp(warm, Math.min(.6, (HORIZON_SCALES[ring] - 1) * .12));
+    for (let i = 0; i < HORIZON_RING_POINTS; i++) {
+      const offset = (ring * HORIZON_RING_POINTS + i) * 3;
+      colors[offset] = tint.r; colors[offset + 1] = tint.g; colors[offset + 2] = tint.b;
+    }
+  }
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  const indices = [];
+  for (let ring = 0; ring < HORIZON_SCALES.length - 1; ring++) {
+    for (let i = 0; i < HORIZON_RING_POINTS; i++) {
+      const next = (i + 1) % HORIZON_RING_POINTS;
+      const a = ring * HORIZON_RING_POINTS + i;
+      const b = ring * HORIZON_RING_POINTS + next;
+      const c = (ring + 1) * HORIZON_RING_POINTS + i;
+      const d = (ring + 1) * HORIZON_RING_POINTS + next;
+      indices.push(a, b, c, b, d, c);
+    }
+  }
+  geo.setIndex(indices);
+  const mat = new THREE.MeshStandardMaterial({
+    map: state.baseTexture || null, color: 0xffffff, vertexColors: true, roughness: .98,
+    metalness: 0, side: THREE.DoubleSide
+  });
+  horizonMesh = new THREE.Mesh(geo, mat);
+  horizonMesh.name = 'demHorizon';
+  horizonMesh.visible = false;
+  horizonMesh.receiveShadow = true;
+  scene.add(horizonMesh);
+  horizonHeights = new Float32Array(count);
+}
+
+function rebuildHorizon(centerX_m, centerZ_m) {
+  ensureHorizonCreated();
+  const half = CONFIG.PATCH_SIZE_M / 2;
+  const width = state.terrainWidth, depth = state.terrainDepth;
+  const pos = horizonMesh.geometry.attributes.position;
+  const uv = horizonMesh.geometry.attributes.uv;
+  for (let ring = 0; ring < HORIZON_SCALES.length; ring++) {
+    for (let i = 0; i < HORIZON_RING_POINTS; i++) {
+      const side = Math.floor(i / HORIZON_SIDE_STEPS);
+      const u = (i % HORIZON_SIDE_STEPS) / HORIZON_SIDE_STEPS;
+      const sx = side === 0 ? -1 + 2 * u : side === 1 ? 1 : side === 2 ? 1 - 2 * u : -1;
+      const sz = side === 0 ? -1 : side === 1 ? -1 + 2 * u : side === 2 ? 1 : 1 - 2 * u;
+      const localX = sx * half * HORIZON_SCALES[ring];
+      const localZ = sz * half * HORIZON_SCALES[ring];
+      const worldX = centerX_m + localX, worldZ = centerZ_m + localZ;
+      const h = sampleDemHeightRelM(
+        THREE.MathUtils.clamp(worldX, -width / 2, width / 2),
+        THREE.MathUtils.clamp(worldZ, -depth / 2, depth / 2)
+      ) ?? 0;
+      const index = ring * HORIZON_RING_POINTS + i;
+      horizonHeights[index] = h;
+      pos.setXYZ(index, localX, h * state.exaggeration, localZ);
+      uv.setXY(index,
+        THREE.MathUtils.clamp((worldX + width / 2) / width, 0, 1),
+        1 - THREE.MathUtils.clamp((worldZ + depth / 2) / depth, 0, 1));
+    }
+  }
+  horizonMesh.position.set(centerX_m, 0, centerZ_m);
+  pos.needsUpdate = true;
+  uv.needsUpdate = true;
+  horizonMesh.geometry.computeVertexNormals();
+  horizonMesh.geometry.computeBoundingSphere();
+  horizonMesh.updateMatrixWorld(true);
+}
+
 function ensureLocalPatchCreated() {
   if (state.localPatchMesh) return;
 
@@ -1344,7 +1429,7 @@ function ensureLocalPatchCreated() {
     map: state.baseTexture || null,
     color: 0xffffff,
     bumpMap: bumpTex,
-    bumpScale: 0.45,
+    bumpScale: 0.62,
     roughness: 0.94,
     metalness: 0.02,
     side: THREE.DoubleSide,
@@ -1358,6 +1443,7 @@ function ensureLocalPatchCreated() {
   state.localPatchGeo = geo;
   state.localPatchMesh = mesh;
   state.localPatchHeights = new Float32Array(N * N);
+  ensureHorizonCreated();
 }
 
 /**
@@ -1420,11 +1506,13 @@ export function rebuildLocalPatch(centerX_m, centerZ_m) {
   state.localPatchGeo.computeBoundingBox();
   state.localPatchGeo.computeBoundingSphere();
   state.localPatchMesh.updateMatrixWorld(true);
+  rebuildHorizon(centerX_m, centerZ_m);
 }
 
 export function enableLocalPatch(centerX_m, centerZ_m) {
   rebuildLocalPatch(centerX_m, centerZ_m);
   if (state.localPatchMesh) state.localPatchMesh.visible = true;
+  if (horizonMesh) horizonMesh.visible = true;
   if (state.terrainMesh) state.terrainMesh.visible = false;
   applyWeatherAtmosphere();
   updateRouteViewMode();
@@ -1442,6 +1530,7 @@ export function updateLocalPatchIfNeeded(x_m, z_m) {
 
 export function disableLocalPatch() {
   if (state.localPatchMesh) state.localPatchMesh.visible = false;
+  if (horizonMesh) horizonMesh.visible = false;
   if (state.terrainMesh) state.terrainMesh.visible = true;
   applyWeatherAtmosphere();
   updateRouteViewMode();
@@ -1477,6 +1566,14 @@ export function applyHeights(ex) {
     state.localPatchGeo.computeBoundingBox();
     state.localPatchGeo.computeBoundingSphere();
     if (state.localPatchMesh) state.localPatchMesh.updateMatrixWorld(true);
+  }
+
+  if (horizonMesh && horizonHeights) {
+    const hPos = horizonMesh.geometry.attributes.position;
+    for (let i = 0; i < horizonHeights.length; i++) hPos.setY(i, horizonHeights[i] * ex);
+    hPos.needsUpdate = true;
+    horizonMesh.geometry.computeVertexNormals();
+    horizonMesh.geometry.computeBoundingSphere();
   }
 
   /* Actualizar altura visual de la ruta 3D y de los POIs al cambiar la exageración (T8 y T9) */
