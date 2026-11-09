@@ -64,7 +64,7 @@ export async function loadHeightmap() {
   /* 1. Leer metadata.json */
   let metadata;
   try {
-    const res = await fetch(metaUrl, { cache: 'no-store' });
+    const res = await fetch(metaUrl);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} al solicitar ${metaUrl}`);
     }
@@ -104,7 +104,7 @@ export async function loadHeightmap() {
 
   /* 1b. Leer config_fisio.json (contrato 4.2); si no existe, usar defaults de CONFIG */
   try {
-    const fisioRes = await fetch(`${baseDir}/config_fisio.json`, { cache: 'no-store' });
+    const fisioRes = await fetch(`${baseDir}/config_fisio.json`);
     if (fisioRes.ok) {
       const fisioData = await fisioRes.json();
       if (typeof fisioData.gravity_ms2 === 'number') state.fisio.gravity_ms2 = fisioData.gravity_ms2;
@@ -140,7 +140,7 @@ export async function loadHeightmap() {
 
   let demFloat32;
   try {
-    const res = await fetch(f32Url, { cache: 'no-store' });
+    const res = await fetch(f32Url);
     if (!res.ok) {
       throw new Error(`HTTP ${res.status} al solicitar ${f32Url}`);
     }
@@ -2851,7 +2851,7 @@ function drawRouteElevationProfile() {
 
 async function loadDefaultRouteIfPresent(baseDir) {
   try {
-    const res = await fetch(`${baseDir}/route.json`, { cache: 'no-store' });
+    const res = await fetch(`${baseDir}/route.json`);
     if (res.ok) {
       const routeData = await res.json();
       if (routeData && Array.isArray(routeData.path_m) && routeData.path_m.length >= 2) {
@@ -2880,7 +2880,7 @@ const POI_COLORS = {
 async function loadPOIsIfPresent(baseDir) {
   state.pois = [];
   try {
-    const res = await fetch(`${baseDir}/poi.json`, { cache: 'no-store' });
+    const res = await fetch(`${baseDir}/poi.json`);
     if (res.ok) {
       const poiData = await res.json();
       if (poiData && Array.isArray(poiData.points)) {

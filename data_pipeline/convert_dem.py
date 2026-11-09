@@ -303,14 +303,14 @@ def main():
     parser.add_argument(
         "--dem",
         type=str,
-        default="Semana 1/JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif",
-        help="Ruta al GeoTIFF de entrada",
+        required=True,
+        help="Ruta al GeoTIFF de entrada (p. ej. JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif)",
     )
     parser.add_argument(
         "--texture",
         type=str,
-        default="Semana 1/jezero_heightmap.png",
-        help="Ruta a textura base opcional existente",
+        default=None,
+        help="Ruta a textura base opcional existente (PNG)",
     )
     parser.add_argument(
         "--dataset-id",
