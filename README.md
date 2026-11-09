@@ -1,75 +1,100 @@
-# Marswalk 3D — Exploración EVA e Inteligencia Topográfica en Marte
+# Marswalk 3D — Exploración EVA en Marte
 
-Aplicación 3D interactiva en navegador (ES Modules + Three.js, sin empaquetador) para exploración orbital y en primera persona de modelos digitales de elevación (DEM) marcianos, con telemetría fisiológica EVA (`PLSS`), sistema de capas científicas (*Layered View*), puntos de interés (`POIs`) y planificación de rutas seguras mediante **A\* (Clásico)** y **QAOA (Cuántico-inspirado)**.
+**🚀 Demo en vivo: https://angelgab3.github.io/Preparation/**
 
----
+Mapa 3D interactivo para que un astronauta planifique y ejecute una caminata (EVA) en el **cráter Jezero**. Combina datos de varias misiones de la NASA en una sola vista por capas, calcula rutas seguras y estima el consumo de oxígeno según el terreno.
 
-## 1. Inicio rápido (Servidor estático local)
+Proyecto para el reto *Interplanetary Survival Guide: Martian Map* — NASA Space Apps Challenge 2026.
 
-Ejecuta un servidor HTTP estático desde la raíz del proyecto (`Prototype/`):
+![Vista orbital de Jezero con ruta planificada](docs/screenshot.jpg)
 
-```bash
-python3 -m http.server 8000
-```
+## ¿Qué hace?
 
-Abre en el navegador:
-- **Cráter Jezero (CTX 20 m/px):** `http://localhost:8000/?dataset=jezero_test`
-- **Cráter Sintético (Validación 50 m/px):** `http://localhost:8000/?dataset=synth_crater`
+| Necesidad del astronauta | Cómo la resuelve Marswalk |
+| --- | --- |
+| Saber dónde está y qué hay alrededor | Relieve 3D real (DEM CTX 20 m/px y HiRISE 1 m/px) con puntos de interés científicos |
+| Combinar varios tipos de datos | Capas de textura (CTX/MOLA), pendiente, riesgo, mineralogía CRISM e inercia térmica THEMIS |
+| Moverse con seguridad | Rutas óptimas A\* y QAOA que evitan pendientes > 25°, perfil de elevación y estimación de O₂ |
+| Conocer las condiciones actuales | Sol, temperatura, viento y polvo (MEDA), simulación de tormenta y evacuación a refugio |
+| Ver el lugar antes de llegar | Vista en 1ª/3ª persona con visor EVA: oxígeno, pulso, brújula y mini-radar |
 
-*(También puedes cambiar de dataset directamente desde el selector desplegable del panel superior izquierdo).*
+## Inicio rápido
 
----
-
-## 2. Pipeline de datos (Conversión de un nuevo DEM en un comando)
-
-Para convertir cualquier GeoTIFF de elevación marciana (Float32) al contrato estándar `data/<dataset_id>/` (`metadata.json`, `heightmap.f32`, `texture.png`, `config_fisio.json`), ejecuta:
+Requiere Node.js 20+.
 
 ```bash
-python3 data_pipeline/convert_dem.py \
-  --dem "Semana 1/JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m_Eqc_latTs0_lon0.tif" \
-  --texture "Semana 1/jezero_heightmap.png" \
-  --dataset-id jezero_test
+npm install
+npm run dev
 ```
 
-> El script utiliza únicamente la biblioteca estándar de Python (`struct`, `zlib`, `json`, `math`), sin depender de GDAL/rasterio.
+Abre `http://localhost:8000/`. Parámetros útiles:
 
-### Validación automática de contratos (Sección 4)
+- `?dataset=jezero_test` · `?dataset=hirise_jezero` · `?dataset=synth_crater` — elige la zona (también desde el selector del panel derecho).
+- `?nointro=1` — salta la introducción y abre el mapa directamente.
 
-Verifica que todos los datasets en `data/` cumplan los contratos `4.1` (`metadata.json` + `.f32`), `4.2` (`config_fisio.json`), `4.3` (`route.json`) y `4.4` (`poi.json`):
+### Scripts
+
+| Comando | Qué hace |
+| --- | --- |
+| `npm run dev` | Servidor de desarrollo (Vite, puerto 8000) |
+| `npm run build` | Compila a `dist/` |
+| `npm run preview` | Sirve `dist/` para probar la versión compilada |
+| `npm test` | Pruebas del modelo de salud y rutas (`node --test`) |
+| `npm run lint` | ESLint sobre `src/` |
+| `npm run check` | Lint + validación de datos + build |
+
+## Controles
+
+**Vista orbital**
+- Arrastrar / rueda / clic derecho: rotar, zoom y desplazar.
+- Clic en el terreno o en un POI: elevación, pendiente, distancia y fuente científica.
+- Arrastra el astronauta al mapa para colocarlo.
+- **📍 Elegir Inicio / Destino** traza la ruta; puedes exportarla como `route.json`.
+- En móvil, los paneles se abren con las pestañas **Ruta** y **Capas** de la esquina superior.
+
+**Exploración en superficie**
+- `W A S D` / flechas: caminar (1.2 m/s) · `Shift`: correr (2.5 m/s) · `Espacio`: saltar (g = 3.71 m/s²).
+- `V`: alternar 1ª / 3ª persona · `E`: analizar · `Esc`: volver a la vista orbital.
+
+## Datos
+
+Cada zona vive en `public/data/<dataset_id>/` con este contrato (ver `docs/contrato_4.5.md`):
+
+- `metadata.json` + `heightmap.f32` — DEM en Float32
+- `texture.png` — textura base
+- `config_fisio.json`, `config_health.json` — parámetros fisiológicos (gravedad, velocidad, O₂)
+- `poi.json`, `route.json` — puntos de interés y ruta (opcionales)
+
+Para convertir un GeoTIFF Float32 sin comprimir a este formato (solo usa la biblioteca estándar de Python):
 
 ```bash
-python3 data_pipeline/validate_contracts.py
+python3 data_pipeline/convert_dem.py --dem ruta/al/DEM.tif --texture ruta/a/textura.png --dataset-id mi_zona
 ```
 
----
+El DEM de Jezero usado es `JEZ_ctx_B_soc_008_DTM_MOLAtopography_DeltaGeoid_20m` (Mars 2020 Science Team / USGS Astrogeology). Para validar todos los datasets:
 
-## 3. Controles y funcionalidades principales
+```bash
+npm run validate:data
+```
 
-### Vista Orbital
-- **Rotar / Zoom / Paneo:** Clic izquierdo + arrastrar / Rueda del ratón / Clic derecho + arrastrar.
-- **Inspección científica y POIs:** Haz clic sobre cualquier punto del terreno o sobre un marcador 3D de POI para abrir el popup con elevación real (m), pendiente real (°), distancia al astronauta y cita científica.
-- **Reubicar astronauta:** Arrastra el marcador del astronauta sobre el terreno o usa el botón **«Mover astronauta aquí»** en el popup.
-- **Capas de visualización (*Layered View*):** Activa/desactiva y regula la opacidad de `Textura Base`, `Pendiente (°)`, `Riesgo Terreno` y `POIs Ciencia`.
-- **Planificador de Ruta (A\* / QAOA):**
-  - Alterna entre **`A* (Clásico)`**, **`QAOA (Cuántico)`** o **`A* vs QAOA`** (comparación simultánea en el terreno).
-  - Usa **«📍 Elegir Inicio / Destino»** (o los botones **«🚩 Fijar Inicio (A)»** / **«🏁 Fijar Destino (B)»** del popup) para trazar la ruta óptima proyectada sobre el relieve con flechas direccionales y exportar `route.json`.
+## Despliegue
 
-### Vista en Primera Persona (Visor EVA · PLSS)
-- **Entrar:** Doble clic sobre el marcador del astronauta (o botón **«Entrar en 1ª persona»** del popup).
-- **Movimiento:** `W` `A` `S` `D` o flechas para caminar ($1.2\text{ m/s}$), `Shift` para correr ($2.5\text{ m/s}$), `Espacio` para saltar ($g = 3.71\text{ m/s}^2$), `Esc` para volver a la vista orbital.
-- **HUD EVA en tiempo real:** Reserva y flujo metabólico de $\text{O}_2$ según pendiente e inclinación de marcha, alerta de pendiente crítica ($> 25^\circ$), pulso cardíaco, brújula y mini-radar topográfico de $2 \times 2\text{ km}$ con ruta y POIs cercanos.
+Cada push a `main` compila y publica el sitio en GitHub Pages mediante `.github/workflows/deploy.yml`. Configuración única en GitHub: **Settings → Pages → Source → GitHub Actions**.
 
+## Estructura
 
-## Pantalla de inicio: Tierra → Marte → visor EVA
+```
+index.html           Interfaz (paneles, HUD, intro)
+src/                 Código de la app (Three.js)
+  main.js            Arranque y bucle principal
+  terrain*.js        Carga del DEM, capas, LOD y rutas
+  health*.js         Modelo metabólico, O₂ y rutas por salud
+  controls.js        Cámara, vistas y movimiento
+  cinematic.js       Introducción Tierra → Marte
+public/data/         Datasets (DEM, texturas, POIs)
+data_pipeline/       Conversión y validación de datos (Python)
+tests/               Pruebas unitarias
+docs/                Contratos de datos e ideas de HUD
+```
 
-La portada narra tres escenas 3D. En la Tierra, el astronauta camina hacia un cohete de mayor tamaño y este despega. El viaje muestra Sol, Tierra, Marte y la ruta punteada del cohete. En Marte, el cohete aterriza, el astronauta sale y la cámara avanza hasta su visor. La secuencia termina con terreno marciano en primera persona, polvo en movimiento y el botón «Ir al mapa principal». El botón «Saltar introducción» está disponible desde el inicio y durante el viaje para abrir el mapa inmediatamente. La música y los efectos sintetizados con Web Audio comienzan tras la interacción del usuario; «Repetir viaje» reinicia la historia.
-
-Ejecutar con `npm install && npm run dev` y abrir `http://localhost:8000/?dataset=jezero_test`. `?nointro=1` abre el mapa directamente. Los terrenos y planetas de la introducción son representaciones artísticas; el DEM científico solo se utiliza en el mapa principal.
-
-### Visor EVA en primera persona
-
-Al entrar a explorar se muestra primero el astronauta en tercera persona. Pulsa `V` o el botón de vista para entrar al casco: aparecen el contorno curvo, los cierres laterales y el reflejo tenue del visor. La telemetría de oxígeno, pendiente, velocidad, radar y avisos se distribuye junto a los bordes; la mira queda pequeña en el centro. Pulsa `V` otra vez para volver a tercera persona. El marco no aparece en la vista orbital ni en tercera persona.
-
-La marcha en tercera persona usa cintura y punta de bota articuladas, contramovimiento de hombros y cadera, flexión de rodillas, tobillos, muñecas y dedos, y una pose amortiguada al saltar. El ciclo sigue la velocidad real del astronauta y continúa internamente mientras se usa el casco para que el regreso a tercera persona no corte el movimiento.
-
-La secuencia se comprobó visualmente en Vite desde la Tierra hasta el visor EVA; también se verificó el botón final y el acceso al mapa. El mapa conserva su cargador y controles. El mapa usa ahora el mismo astronauta articulado de la introducción al entrar en tercera persona. La marcha, el giro, el arranque, la frenada y el seguimiento de cámara usan interpolación dependiente del tiempo; al detenerse, el personaje vuelve a una pose de reposo con movimiento sutil. `V` alterna con el visor en primera persona. Falta validar el rendimiento y los controles con teclado/ratón en dispositivos físicos.
+> Los terrenos y planetas de la introducción son representaciones artísticas; el DEM científico solo se usa en el mapa principal.

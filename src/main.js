@@ -16,6 +16,7 @@ import { initTerrainLOD, updateTerrainLOD } from './terrain_lod.js';
 import { initTerrainFX, updateTerrainFX } from './terrain_fx.js';
 import { tickOrbitBackdrop, tickOrbitFill } from './orbit_backdrop.js';
 import { initStats, tickStats } from './stats.js';
+import { initMobileTabs } from './mobile_tabs.js';
 import { createSoloHealth, createGroupHealth, loadHealthModePreference } from './health_group.js';
 
 async function loadConfigHealth(datasetId) {
@@ -51,6 +52,7 @@ const clock = new THREE.Clock();
 (async () => {
   /* 1. Controles primero (crea OrbitControls que otros módulos necesitan) */
   initControls();
+  initMobileTabs();
 
   /* 2. Cargar terreno */
   await loadHeightmap();

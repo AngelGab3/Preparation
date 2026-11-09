@@ -2772,3 +2772,107 @@ body.helmet-view .hud-radio-toast.visible {
   .helmet-shell { transition: none; }
   body.helmet-view .hud-interact-prompt { animation: none; }
 }
+
+/* ------------------------------------------- Móvil: paneles como hoja inferior (solo ≤760 px) */
+.mobile-tabs {
+  display: none;
+}
+
+@media (max-width: 760px) {
+  .hint {
+    display: none;
+  }
+
+  .mobile-tabs {
+    position: fixed;
+    top: 12px;
+    right: 12px;
+    z-index: 32;
+    display: flex;
+    gap: 6px;
+  }
+
+  body.fp .mobile-tabs {
+    display: none;
+  }
+
+  .mobile-tab {
+    padding: 8px 12px;
+    font: inherit;
+    font-size: 12px;
+    color: var(--text);
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    cursor: pointer;
+  }
+
+  .mobile-tab[aria-expanded='true'] {
+    color: #0b0d10;
+    background: var(--accent);
+    border-color: var(--accent);
+  }
+
+  /* Paneles ocultos por defecto; se abren uno a la vez */
+  .layers-panel.left-panel,
+  .layers-panel.right-panel {
+    display: none;
+  }
+
+  body.m-route:not(.fp) #route-panel,
+  body.m-layers:not(.fp) #layers-panel {
+    position: fixed;
+    display: flex;
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    z-index: 30;
+    min-width: 0;
+    max-width: none;
+    max-height: 62vh;
+    padding-bottom: 18px;
+    box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.45);
+    animation: m-sheet-in 0.22s ease-out;
+  }
+
+  .left-orbital-stack {
+    top: 12px;
+    left: 12px;
+  }
+
+  .astronaut-dock {
+    left: auto;
+    bottom: auto;
+    width: 84px;
+    padding: 8px 6px 6px;
+  }
+
+  .controls {
+    left: 8px;
+    right: 8px;
+    bottom: 8px;
+    min-width: 0;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .info-popup {
+    min-width: 180px;
+    max-width: calc(100vw - 24px);
+  }
+}
+
+@keyframes m-sheet-in {
+  from { transform: translateY(24px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.m-route #route-panel,
+  body.m-layers #layers-panel {
+    animation: none;
+  }
+}
