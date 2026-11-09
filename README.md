@@ -29,7 +29,7 @@ npm run dev
 
 Abre `http://localhost:8000/`. Parámetros útiles:
 
-- `?dataset=jezero_test` · `?dataset=hirise_jezero` · `?dataset=synth_crater` — elige la zona (también desde el selector del panel derecho).
+- `?dataset=hirise_jezero` (predeterminado) · `?dataset=jezero_test` · `?dataset=synth_crater` — elige la zona (también desde el selector del panel derecho).
 - `?nointro=1` — salta la introducción y abre el mapa directamente.
 
 ### Scripts

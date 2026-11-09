@@ -678,13 +678,16 @@ function renderGroupHUD() {
       m.flags.o2_depleted || m.flags.over_sustainable_metabolic || m.flags.thermal_critical || m.flags.dehydration_critical ? 'critical'
         : m.flags.hr_above_85pct_max || m.flags.o2_low || m.flags.thermal_warning || m.flags.dehydration_warning ? 'warn'
           : 'nominal';
-    const roleTag = m.role === 'leader' ? 'L' : m.role === 'follower' ? 'F' : '·';
+    const roleTag = m.nav_role === 'leader' ? 'L' : m.nav_role === 'follower' ? 'F' : '·';
     const tCore = typeof m.t_core_c === 'number' ? `${m.t_core_c.toFixed(1)}°C` : '—';
     const hyd = typeof m.dehydration_pct_body_mass === 'number' ? `${m.dehydration_pct_body_mass.toFixed(1)}%` : '—';
+    const effort = typeof m.metabolic_fraction_of_max === 'number' ? `${(m.metabolic_fraction_of_max * 100).toFixed(0)}%` : '—';
+    const autonomy = Number.isFinite(m.o2_time_remaining_min) ? `${(m.o2_time_remaining_min / 60).toFixed(1)}h` : '—';
+    const dose = typeof m.dose_usv === 'number' ? `${m.dose_usv.toFixed(1)}µSv` : '—';
     return `<div class="group-member ${statusClass} ${isLeader ? 'leader' : ''}">
       <span class="member-role">${roleTag}</span>
-      <span class="member-id">${m.id}</span>
-      <span class="member-metric">O₂ ${m.o2_remaining_l.toFixed(0)}L · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W · ${tCore} · ${hyd}</span>
+      <span class="member-id">${m.name || m.id}</span>
+      <span class="member-metric" title="O₂ restante · autonomía · FC · metabolismo (esfuerzo vs sostenible) · T núcleo · deshidratación · dosis GCR">O₂ ${m.o2_remaining_l.toFixed(0)}L (${autonomy}) · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W ${effort} · ${tCore} · ${hyd} · ${dose}</span>
     </div>`;
   }).join('');
 
@@ -692,7 +695,7 @@ function renderGroupHUD() {
     const routeMode = (state.routeCostMode || 'oxygen').toUpperCase();
     const tCore = typeof agg.max_t_core_c === 'number' ? `${agg.max_t_core_c.toFixed(1)}` : '—';
     const hyd = typeof agg.max_dehydration_pct === 'number' ? `${agg.max_dehydration_pct.toFixed(1)}` : '—';
-    extraEl.textContent = `MODELO: G2 · RUTA: ${routeMode} · TÉRMICA: ${tCore}°C · DESHID: ${hyd}%`;
+    extraEl.textContent = `MODELO: G3 · TRAJE: ${(state.health?.cfg?.suit_id || 'xemu').toUpperCase()} · RUTA: ${routeMode} · TÉRMICA: ${tCore}°C · DESHID: ${hyd}%`;
   }
 }
 /* === /G1+G2 === */
@@ -1153,13 +1156,17 @@ function renderComparisonTable(comp) {
 
   const rows = [
     { label: 'Distancia (m)', classic: classic.total_distance_m.toFixed(0), health: health.total_distance_m.toFixed(0), delta: fmtAbs(deltas.distance_m) + ' (' + fmtPct(deltas.distance_pct) + ')', cls: classFor(deltas.distance_m) },
+    { label: 'Tiempo (min)', classic: (classic.total_time_h * 60).toFixed(0), health: (health.total_time_h * 60).toFixed(0), delta: fmtAbs(deltas.time_h * 60) + ' (' + fmtPct(deltas.time_pct) + ')', cls: classFor(deltas.time_h) },
+    { label: 'Ritmo medio (m/s)', classic: classic.mean_pace_ms.toFixed(2), health: health.mean_pace_ms.toFixed(2), delta: fmtAbs(health.mean_pace_ms - classic.mean_pace_ms, 2), cls: 'delta-neutral' },
     { label: 'Pendiente máx (°)', classic: classic.max_slope_deg.toFixed(1), health: health.max_slope_deg.toFixed(1), delta: fmtAbs(deltas.max_slope_deg, 1) + '°', cls: classFor(deltas.max_slope_deg) },
     { label: 'Peak M (W)', classic: classic.peak_metabolic_w.toFixed(0), health: health.peak_metabolic_w.toFixed(0), delta: fmtAbs(deltas.peak_metabolic_w) + ' (' + fmtPct(deltas.peak_metabolic_pct) + ')', cls: classFor(deltas.peak_metabolic_w) },
     { label: 'Peak FC (bpm)', classic: classic.peak_hr_bpm.toFixed(0), health: health.peak_hr_bpm.toFixed(0), delta: fmtAbs(deltas.peak_hr_bpm) + ' (' + fmtPct(deltas.peak_hr_pct) + ')', cls: classFor(deltas.peak_hr_bpm) },
     { label: 'O₂ usado (L)', classic: classic.o2_used_l.toFixed(1), health: health.o2_used_l.toFixed(1), delta: fmtAbs(deltas.o2_used_l, 1) + ' (' + fmtPct(deltas.o2_used_pct) + ')', cls: classFor(deltas.o2_used_l) },
     { label: 'Peak T_core (°C)', classic: classic.peak_t_core_c.toFixed(2), health: health.peak_t_core_c.toFixed(2), delta: fmtAbs(deltas.peak_t_core_c, 2) + '°C', cls: classFor(deltas.peak_t_core_c) },
+    { label: 'Sobre el límite (min)', classic: classic.overload_time_min.toFixed(1), health: health.overload_time_min.toFixed(1), delta: fmtAbs(deltas.overload_time_min, 1), cls: classFor(deltas.overload_time_min) },
+    { label: 'Dosis GCR (µSv)', classic: classic.dose_usv.toFixed(1), health: health.dose_usv.toFixed(1), delta: fmtAbs(health.dose_usv - classic.dose_usv, 1), cls: classFor(health.dose_usv - classic.dose_usv) },
     { label: 'Deshidrat. máx (%)', classic: classic.peak_dehydration_pct.toFixed(2), health: health.peak_dehydration_pct.toFixed(2), delta: fmtAbs(deltas.peak_dehydration_pct, 2) + '%', cls: classFor(deltas.peak_dehydration_pct) },
-    { label: 'Estado final', classic: classic.status, health: health.status, delta: deltas.status_changed ? 'cambió' : 'igual', cls: health.status === 'nominal' ? 'delta-good' : (health.status === 'critical' ? 'delta-bad' : 'delta-neutral') },
+    { label: 'Peor estado', classic: classic.status, health: health.status, delta: deltas.status_changed ? 'cambió' : 'igual', cls: health.status === 'nominal' ? 'delta-good' : (health.status === 'critical' ? 'delta-bad' : 'delta-neutral') },
   ];
 
   tbody.innerHTML = rows.map((r) => `

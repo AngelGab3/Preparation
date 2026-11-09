@@ -46,8 +46,12 @@ test('aggregateGroupState: binding members per dimension', () => {
     const movingSegment = { ...SEG, walk_speed_ms: 1.2 };
     const after = advanceGroupState(seeded, movingSegment);
     const agg = aggregateGroupState(after);
-    assert.equal(agg.binding_member_metabolic, 'heavy');
+    /* G3.1: el limitante metabólico es el de mayor esfuerzo RELATIVO a su capacidad
+     * (60 años → menor VO₂máx), aunque el más pesado gaste más watts y más O₂ */
+    assert.equal(agg.binding_member_metabolic, 'old');
     assert.equal(agg.binding_member_o2, 'heavy');
+    const heavy = agg.members.find((m) => m.id === 'heavy');
+    assert.equal(agg.max_metabolic_w, heavy.metabolic_rate_w);
 });
 
 test('aggregateGroupState: flags propagate to status', () => {
@@ -63,7 +67,7 @@ test('aggregateGroupState: solo mode reports leader as solo', () => {
     const after = advanceGroupState(h, SEG);
     const agg = aggregateGroupState(after);
     assert.equal(agg.mode, 'solo');
-    assert.equal(agg.members[0].role, 'solo');
+    assert.equal(agg.members[0].nav_role, 'solo');
 });
 
 test('sum_o2_consumed_l is additive, min_o2_remaining is not', () => {

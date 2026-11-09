@@ -16,14 +16,14 @@ export function computeHealthCostFactor(segment, group, weights, mode) {
 
     /* Factores por dimensión (0..1+, >1 = peor) */
     const fSlope = segment.slope_deg ? Math.min(3, segment.slope_deg / maxSafe) : 0;
-    const fMet = Math.min(3, agg.max_metabolic_w / group.cfg.max_sustainable_m_w);
-    const fHR = Math.min(3, agg.max_hr_bpm / group.cfg.hr_max_bpm);
+    const fMet = Math.min(3, agg.max_metabolic_fraction ?? agg.max_metabolic_w / group.cfg.max_sustainable_m_w);
+    const fHR = Math.min(3, agg.max_hr_fraction ?? agg.max_hr_bpm / group.cfg.hr_max_bpm);
     const fO2 = Math.max(0, 1 - agg.min_o2_remaining_l / group.cfg.o2_capacity_l_equiv);
     const fTh = Math.min(3, Math.max(0, (agg.max_t_core_c - 37) / 2));
     const fHyd = Math.min(3, agg.max_dehydration_pct / (group.cfg.dehydration_critical_pct_body_mass || 4.0));
 
-    /* Radiación y contingencia: sin modelo en G2 → factor 0 */
-    const fRad = 0, fCont = 0;
+    /* Radiación GCR ∝ tiempo; contingencia sin modelo → 0 */
+    const fRad = (group.cfg.surface_dose_rate_usv_h ?? 27.9) / 27.9, fCont = 0;
 
     const w = weights;
     const weighted =

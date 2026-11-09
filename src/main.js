@@ -3,6 +3,7 @@ import './styles.css';
 import './signal-intro.css';
 import * as THREE from 'three';
 import { state } from './state.js';
+import { CONFIG } from './config.js';
 import { renderer, scene, camera, stars } from './scene.js';
 import { loadHeightmap, tickRouteAnimation, updateSolarCycle } from './terrain.js';
 import { initAstronaut } from './astronaut.js';
@@ -31,7 +32,7 @@ async function loadConfigHealth(datasetId) {
 
 async function initHealthState() {
   const mode = loadHealthModePreference();
-  const raw = await loadConfigHealth(state.datasetId || 'jezero_test');
+  const raw = await loadConfigHealth(state.datasetId || CONFIG.DEFAULT_DATASET);
   const cfgOverrides = raw ? { ...raw } : {};
   delete cfgOverrides.members;
   delete cfgOverrides.dataset_id;
