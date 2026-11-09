@@ -11,10 +11,65 @@ const V=(x,y,z)=>new T.Vector3(x,y,z);
 const material=(color,metalness=0)=>new T.MeshStandardMaterial({color,roughness:.82,metalness,flatShading:true});
 const cream=material(0xe9e3da), ink=material(0x293342), orange=material(0xd67852), brass=material(0xe7bd87,.25);
 let active=false,playing=false,elapsed=0,lastFrame=0,elapsedTotal=0,ready=false;
-let scene,camera,renderer,earthGroup,marsGroup,solarGroup,fpTerrain,explorer,actor,rocket,route,solarRocket,dust,outerStars;
+let scene,camera,renderer,earthGroup,marsGroup,solarGroup,fpTerrain,explorer,actor,rocket,solarRocket,dust,warpStreaks,warpStarData,marsTarget,warpFlame,grid;
 let audioContext,audioMaster,musicLoop,prevPhase='',prevEarthBeat='',savedFocus,savedOrbit,siblings=[];
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const duration=33;
+const travelHoldAt=12.5;
+const travelCards=Array.from({length:10},(_,i)=>({
+ label:`REGISTRO ${String(i+1).padStart(2,'0')}`,
+ title:'Contenido por definir',
+ body:'Aquí aparecerá la información que nos compartas para esta tarjeta.'
+}));
+let travelCardIndex=0,travelComplete=false,wheelDistance=0,lastWheelAt=0,wheelLockedUntil=0,touchStartY=null;
+
+function travelCardsActive(){return active&&playing&&!travelComplete&&elapsed>=8&&elapsed<17}
+function renderTravelCard(){
+ const card=travelCards[travelCardIndex],number=String(travelCardIndex+1).padStart(2,'0');
+ el('signal-card-count').textContent=`${number} / ${travelCards.length}`;
+ el('signal-card-label').textContent=card.label;
+ el('signal-card-title').textContent=card.title;
+ el('signal-card-body').textContent=card.body;
+ const touch=matchMedia('(pointer:coarse)').matches;
+ el('signal-travel-instruction').textContent=travelCardIndex===travelCards.length-1
+  ?touch?'DESLIZA ↑ PARA ATERRIZAR · ↓ ANTERIOR':'SCROLL ↓ INICIAR ATERRIZAJE · ↑ ANTERIOR'
+  :touch?'DESLIZA ↑ SIGUIENTE TARJETA · ↓ ANTERIOR':'SCROLL ↓ SIGUIENTE TARJETA · ↑ ANTERIOR';
+ for(const [i,step] of [...el('signal-card-progress').children].entries()){
+  step.classList.toggle('is-current',i===travelCardIndex);
+  step.classList.toggle('is-past',i<travelCardIndex);
+ }
+ const panel=el('signal-travel');panel.classList.remove('is-changing');void panel.offsetWidth;panel.classList.add('is-changing');
+}
+function moveTravelCard(direction){
+ if(!travelCardsActive())return;
+ const next=travelCardIndex+direction;
+ if(next<0)return;
+ if(next>=travelCards.length){
+  travelComplete=true;ui.classList.add('is-approaching');el('signal-travel').setAttribute('aria-hidden','true');
+  setText('02 / TRAYECTO','MARTE A LA VISTA','El cohete inicia su aproximación.','PREPARANDO ATERRIZAJE');tone(130,.75,.06,'sawtooth');
+  return;
+ }
+ travelCardIndex=next;renderTravelCard();tone(320+next*24,.12,.025);
+}
+function onTravelWheel(event){
+ if(!travelCardsActive())return;
+ event.preventDefault();
+ const now=performance.now();
+ if(now<wheelLockedUntil)return;
+ if(now-lastWheelAt>180)wheelDistance=0;
+ lastWheelAt=now;
+ wheelDistance+=event.deltaY*(event.deltaMode===1?16:event.deltaMode===2?600:1);
+ if(Math.abs(wheelDistance)<55)return;
+ moveTravelCard(Math.sign(wheelDistance));
+ wheelDistance=0;wheelLockedUntil=now+620;
+}
+function onTravelKey(event){
+ if(!travelCardsActive()||event.altKey||event.ctrlKey||event.metaKey)return;
+ const direction=['ArrowDown','PageDown',' '].includes(event.key)?1:['ArrowUp','PageUp'].includes(event.key)?-1:0;
+ if(!direction)return;
+ if(event.key===' '&&event.target instanceof Element&&event.target.closest('button'))return;
+ event.preventDefault();moveTravelCard(direction);
+}
 
 function add(parent,geometry,mat,x=0,y=0,z=0){
  const mesh=new T.Mesh(geometry,mat);mesh.position.set(x,y,z);mesh.castShadow=true;mesh.receiveShadow=true;parent.add(mesh);return mesh;
@@ -74,18 +129,49 @@ function globe(group,x,r,color,accent){
 }
 function makeSolar(){
  solarGroup=new T.Group();scene.add(solarGroup);
- globe(solarGroup,-6.2,1.14,0xeabd69,0xffde9e);
- globe(solarGroup,-3.1,.57,0x326fa1,0x70a367);
- globe(solarGroup,3.2,.45,0xc56c4d,0xe69e74);
- const sun=solarGroup.children[0];sun.material.emissive=new T.Color(0xb66d33);sun.material.emissiveIntensity=.75;
- for(const r of [3.1,6.4]){const curve=new T.EllipseCurve(-6.2,0,r,r*.32,0,Math.PI*2);const points=curve.getPoints(120).map(v=>V(v.x,-.7,v.y));const line=new T.LineLoop(new T.BufferGeometry().setFromPoints(points),new T.LineBasicMaterial({color:0x645362,transparent:true,opacity:.45}));solarGroup.add(line)}
- const points=[];for(let i=0;i<=90;i++){const u=i/90;points.push(V(mix(-3.1,3.2,u),.28+2.1*Math.sin(Math.PI*u),1.25+Math.sin(Math.PI*u)*.65))}
- route=new T.CatmullRomCurve3(points);
- const routeLine=new T.Line(new T.BufferGeometry().setFromPoints(route.getPoints(150)),new T.LineDashedMaterial({color:0xf9b68e,dashSize:.1,gapSize:.09,transparent:true,opacity:.85}));routeLine.computeLineDistances();solarGroup.add(routeLine);
- const marker=add(solarGroup,new T.SphereGeometry(.08,12,8),new T.MeshBasicMaterial({color:0xffe9b2}),-3.1,.3,1.25);marker.name='route-marker';
- solarRocket=makeRocket(solarGroup);solarRocket.root.scale.setScalar(.46);solarRocket.root.position.copy(points[0]);solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
- const labelMaterial=new T.MeshBasicMaterial({color:0xf6d1b1});
- for(const [x,r] of [[-6.2,1.35],[-3.1,.78],[3.2,.65]]){const ring=add(solarGroup,new T.TorusGeometry(r,.008,4,60),labelMaterial,x,0);ring.rotation.x=Math.PI/2}
+ // The camera follows the full-size rocket from behind. Stars move toward it in long light-speed streaks.
+ solarRocket=makeRocket(solarGroup);
+ solarRocket.root.scale.setScalar(1.85);
+ solarRocket.root.rotation.x=-Math.PI/2;
+ solarRocket.root.position.set(0,0,-3.5);
+ solarRocket.nozzle.visible=true;
+ warpFlame=add(solarRocket.root,new T.ConeGeometry(.095,1.15,12),new T.MeshBasicMaterial({color:0xa6eeff,transparent:true,opacity:.9,depthWrite:false}),0,-.57);
+ warpFlame.rotation.z=Math.PI;
+ const engineLight=new T.PointLight(0x75cfff,2.4,8);
+ engineLight.position.set(0,-.7,0);solarRocket.root.add(engineLight);
+ marsTarget=globe(solarGroup,0,2.2,0xb7533e,0xe8956c);
+ marsTarget.position.set(0,.2,-78);
+ marsTarget.traverse(obj=>{if(obj.isMesh)obj.material.fog=false});
+ const count=560,positions=new Float32Array(count*6),colors=new Float32Array(count*6);
+ warpStarData=new Float32Array(count*4);
+ for(let i=0;i<count;i++){
+  const angle=Math.random()*Math.PI*2,radius=.8+Math.sqrt(Math.random())*19;
+  warpStarData.set([Math.cos(angle)*radius,Math.sin(angle)*radius,3-Math.random()*105,.65+Math.random()*.75],i*4);
+  colors.set([.06,.18,.34,.65,.86,1],i*6);
+ }
+ const geo=new T.BufferGeometry();
+ geo.setAttribute('position',new T.BufferAttribute(positions,3));
+ geo.setAttribute('color',new T.BufferAttribute(colors,3));
+ warpStreaks=new T.LineSegments(geo,new T.LineBasicMaterial({vertexColors:true,transparent:true,opacity:1,blending:T.AdditiveBlending,depthWrite:false,fog:false,toneMapped:false}));
+ warpStreaks.frustumCulled=false;
+ solarGroup.add(warpStreaks);
+}
+function updateWarpStars(dt,u){
+ const accelerate=ease(u/.22),slowdown=1-.55*ease((u-.87)/.13);
+ const speed=(12+112*accelerate)*slowdown;
+ const length=.15+speed*.072;
+ const positions=warpStreaks.geometry.attributes.position;
+ for(let i=0;i<warpStarData.length;i+=4){
+  const x=warpStarData[i],y=warpStarData[i+1];
+  let z=warpStarData[i+2]+speed*warpStarData[i+3]*dt;
+  if(z>4)z-=105;
+  warpStarData[i+2]=z;
+  const k=i/4*2;
+  positions.setXYZ(k,x,y,z-length);
+  positions.setXYZ(k+1,x,y,z);
+ }
+ positions.needsUpdate=true;
+ warpStreaks.material.opacity=ease(u/.08)*(1-.38*ease((u-.91)/.09));
 }
 function makeFpTerrain(){
  const geometry=new T.PlaneGeometry(100,100,90,90);geometry.rotateX(-Math.PI/2);
@@ -103,8 +189,6 @@ function makeParticles(){
  const positions=[];for(let i=0;i<350;i++){const a=i*2.399,r=Math.sqrt((i%90)/90)*4;positions.push(Math.cos(a)*r,(i%31)/31*2.5,Math.sin(a)*r)}
  const geo=new T.BufferGeometry();geo.setAttribute('position',new T.Float32BufferAttribute(positions,3));
  dust=new T.Points(geo,new T.PointsMaterial({color:0xe2a27b,size:.046,transparent:true,opacity:.8,depthWrite:false}));scene.add(dust);
- const stars=[];for(let i=0;i<200;i++)stars.push((Math.random()-.5)*24,(Math.random()-.5)*12,(Math.random()-.5)*14-2);
- outerStars=new T.Points(new T.BufferGeometry().setAttribute('position',new T.Float32BufferAttribute(stars,3)),new T.PointsMaterial({color:0xc9aac2,size:.027}));scene.add(outerStars);
 }
 function initWorld(){
  scene=new T.Scene();scene.background=new T.Color(0x1a2430);scene.fog=new T.Fog(0x1a2430,16,65);
@@ -116,7 +200,7 @@ function initWorld(){
  makeSolar();makeFpTerrain();makeParticles();
  rocket=makeRocket(scene);rocket.root.scale.setScalar(1.45);rocket.root.position.set(1.1,.15,-.2);
  explorer=createExplorer();actor=new T.Group();actor.position.set(-1.5,0,.35);actor.add(explorer.root);scene.add(actor);
- const grid=new T.GridHelper(40,40,0x5d6970,0x40505d);grid.position.y=-.24;scene.add(grid);
+ grid=new T.GridHelper(40,40,0x5d6970,0x40505d);grid.position.y=-.24;scene.add(grid);
  addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
  const ray=new T.Raycaster(),p=new T.Vector2();
  renderer.domElement.addEventListener('pointerup',e=>{if(!active||playing||ready)return;p.set(e.clientX/innerWidth*2-1,-e.clientY/innerHeight*2+1);ray.setFromCamera(p,camera);if(ray.intersectObjects([rocket.root,actor],true).length)start()});
@@ -132,27 +216,27 @@ function audioOn(){
 function tone(f,d=.3,volume=.12,type='sine'){if(!audioContext)return;const t=audioContext.currentTime,o=audioContext.createOscillator(),g=audioContext.createGain();o.type=type;o.frequency.setValueAtTime(f,t);if(type==='sawtooth')o.frequency.exponentialRampToValueAtTime(f*2,t+d);g.gain.setValueAtTime(.0001,t);g.gain.exponentialRampToValueAtTime(volume,t+.025);g.gain.exponentialRampToValueAtTime(.0001,t+d);o.connect(g).connect(audioMaster);o.start(t);o.stop(t+d+.02)}
 function syncAudioLabel(){const on=audioContext&&audioMaster.gain.value>0;el('signal-sound').textContent=on?'♪ SONIDO ACTIVADO':'♪ ACTIVAR SONIDO';el('signal-sound').setAttribute('aria-pressed',String(!!on))}
 function setText(chapter,title,sub,hint){el('signal-kicker').textContent=chapter;el('signal-title').textContent=title;el('signal-subtitle').textContent=sub;el('signal-hint').textContent=hint}
-function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
+function start(){if(playing)return;playing=true;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';travelCardIndex=0;travelComplete=false;el('signal-start').hidden=true;el('signal-continue').hidden=true;ui.classList.add('is-running');if(!reduced)audioOn();syncAudioLabel()}
 function finish(){if(ready)return;ready=true;playing=false;ui.classList.add('is-ready');setText('04 / SUPERFICIE MARCIANA','EL NUEVO HORIZONTE','El terreno te espera. Continúa al mapa para explorar.','VISOR EVA ACTIVO · SUPERFICIE DISPONIBLE');el('signal-continue').hidden=false;el('signal-skip').hidden=true;el('signal-continue').focus({preventScroll:true});tone(392,.6,.06)}
-function reset(){playing=false;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';ui.classList.remove('is-ready','is-running','is-visor');el('signal-start').hidden=false;el('signal-continue').hidden=true;el('signal-skip').hidden=false;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
+function reset(){playing=false;ready=false;elapsed=0;prevPhase='';prevEarthBeat='';travelCardIndex=0;travelComplete=false;wheelDistance=0;wheelLockedUntil=0;ui.classList.remove('is-ready','is-running','is-visor','is-approaching');el('signal-travel').hidden=true;el('signal-travel').removeAttribute('aria-hidden');el('signal-start').hidden=false;el('signal-continue').hidden=true;el('signal-skip').hidden=false;setText('01 / TIERRA','LA MISIÓN COMIENZA','Haz clic en el astronauta o en el cohete para comenzar.','PULSA UNA FIGURA PARA INICIAR');}
 function phaseUpdate(phase){
  if(phase===prevPhase)return;prevPhase=phase;ui.dataset.phase=phase;
  if(phase==='earth')setText('01 / TIERRA','EL PRIMER PASO','El astronauta se dirige al cohete.','RUMBO A MARTE · PREPARANDO DESPEGUE');
- if(phase==='solar'){setText('02 / VIAJE INTERPLANETARIO','RUMBO A MARTE','Sigue la ruta punteada a través del sistema solar.','TRAYECTORIA TIERRA → MARTE');tone(70,2.2,.08,'sawtooth')}
- if(phase==='mars'){setText('03 / ATERRIZAJE','MARTE A LA VISTA','El cohete toca suelo y el astronauta desciende.','APROXIMACIÓN FINAL · SUPERFICIE MARCIANA');tone(90,1.5,.07,'sawtooth')}
+ if(phase==='solar'){setText('02 / TRAYECTO','A TRAVÉS DE LAS ESTRELLAS','El cohete acelera rumbo a Marte.','SCROLL PARA RECORRER LOS 10 REGISTROS');el('signal-travel').hidden=false;renderTravelCard();tone(70,2.2,.08,'sawtooth')}
+ if(phase==='mars'){el('signal-travel').hidden=true;ui.classList.remove('is-approaching');setText('03 / ATERRIZAJE','MARTE A LA VISTA','El cohete toca suelo y el astronauta desciende.','APROXIMACIÓN FINAL · SUPERFICIE MARCIANA');tone(90,1.5,.07,'sawtooth')}
  if(phase==='visor'){setText('04 / VISOR EVA','UN NUEVO MUNDO','La cámara entra en el casco. El paisaje se abre ante ti.','TRANSICIÓN A PRIMERA PERSONA');tone(280,.8,.05)}
 }
 function frame(now){
  requestAnimationFrame(frame);const dt=Math.min(.05,(now-lastFrame)/1000||0);lastFrame=now;if(!active)return;
- elapsedTotal+=dt;if(playing&&!ready){elapsed=Math.min(duration,elapsed+dt);if(elapsed>=duration)finish()}
+ elapsedTotal+=dt;if(playing&&!ready){elapsed=Math.min(duration,travelComplete?elapsed+dt:Math.min(travelHoldAt,elapsed+dt));if(elapsed>=duration)finish()}
  const t=elapsed,phase=t<8?'earth':t<17?'solar':t<26?'mars':'visor';phaseUpdate(phase);
  const inEarth=phase==='earth',inSolar=phase==='solar',inMars=phase==='mars',inVisor=phase==='visor';
  earthGroup.visible=inEarth;solarGroup.visible=inSolar;marsGroup.visible=inMars||inVisor;
  fpTerrain.visible=inVisor&&t>29;
- outerStars.visible=inSolar;dust.visible=!inSolar;
+ grid.visible=!inSolar;dust.visible=!inSolar;
  scene.background.setHex(inSolar?0x100f20:inEarth?0x1a2430:0x35232b);
- scene.fog.color.copy(scene.background);
- const launch=ease((t-5.85)/2.15),travel=ease((t-8)/9),land=ease((t-17)/5.5);
+ scene.fog.color.copy(scene.background);scene.fog.near=inSolar?45:16;scene.fog.far=inSolar?110:65;
+ const launch=ease((t-5.85)/2.15),travel=clamp((t-8)/9),land=ease((t-17)/5.5);
  if(inEarth){
   const approach=ease((t-1.2)/2.25),board=ease((t-4.05)/1.5);
   const facing=ease((t-.35)/.95),toHatch=ease((t-3.35)/.65);
@@ -180,9 +264,19 @@ function frame(now){
   camera.position.set(5.8+launch*.7,5.5+launch*1.2,9.6+launch*1.6);
   camera.lookAt(.15,.92+launch*1.8,0);
  }else if(inSolar){
-  actor.visible=false;rocket.root.visible=false;solarRocket.root.position.copy(route.getPoint(travel));solarRocket.root.rotation.z=-Math.PI/2;solarRocket.nozzle.visible=true;
-  solarGroup.children.find(c=>c.name==='route-marker').position.copy(route.getPoint(travel));
-  camera.position.set(0,4.7,15.5);camera.lookAt(-1,.25,0);
+  actor.visible=false;rocket.root.visible=false;
+  updateWarpStars(dt,travel);
+  const boost=ease(travel/.22),approach=ease((travel-.55)/.45);
+  const flightTime=elapsedTotal;
+  solarRocket.root.position.set(Math.sin(flightTime*1.4)*.12,Math.sin(flightTime*2.2)*.075,-3.5-Math.sin(flightTime*.8)*.15);
+  solarRocket.root.rotation.set(-Math.PI/2+Math.sin(flightTime*1.1)*.024,Math.sin(flightTime*.95)*.035,Math.sin(flightTime*1.7)*.035);
+  solarRocket.nozzle.scale.y=1.1+boost*.55+Math.sin(flightTime*19)*.09;
+  warpFlame.scale.y=1.15+boost*.65+Math.sin(flightTime*22)*.1;
+  marsTarget.position.z=mix(-78,-25,approach);
+  marsTarget.scale.setScalar(mix(1,2.1,approach));
+  camera.position.set(3.55+Math.sin(flightTime*1.2)*.09,2.45+Math.sin(flightTime*1.7)*.055,5.7);
+  camera.lookAt(0,.08,-5.2);
+  const fov=48+8*boost;if(camera.fov!==fov){camera.fov=fov;camera.updateProjectionMatrix()}
  }else if(inMars){
   const open=ease((t-21.35)/.6)*(1-ease((t-25.35)/.5));
   const emerge=ease((t-22.05)/1.15),leave=ease((t-23.15)/2.65);
@@ -208,7 +302,7 @@ function frame(now){
   camera.lookAt(V(mix(0,.05,toward),mix(.8,1.45,toward),mix(0,-8,toward)));
   if(t>29){ui.classList.add('is-visor');fpTerrain.visible=true}
  }
- if(!inVisor&&camera.fov!==42){camera.fov=42;camera.updateProjectionMatrix();ui.classList.remove('is-visor')}
+ if(!inVisor&&!inSolar&&camera.fov!==42){camera.fov=42;camera.updateProjectionMatrix();ui.classList.remove('is-visor')}
  const arr=dust.geometry.attributes.position;for(let i=0;i<arr.count;i++){let y=arr.getY(i)+dt*(.22+(i%7)*.06);if(y>3.4)y=.01;arr.setY(i,y)}arr.needsUpdate=true;dust.rotation.y+=dt*.06;
  renderer.render(scene,camera);
 }
@@ -216,6 +310,15 @@ export const isIntroCinematicActive=()=>active;
 export function initIntroCinematic(){
  if(!ui)return;initWorld();
  el('signal-start').onclick=start;el('signal-continue').onclick=stopIntroCinematic;el('signal-skip').onclick=stopIntroCinematic;el('signal-replay').onclick=reset;
+ for(let i=0;i<travelCards.length;i++)el('signal-card-progress').appendChild(document.createElement('span'));
+ ui.addEventListener('wheel',onTravelWheel,{passive:false});
+ ui.addEventListener('touchstart',event=>{if(travelCardsActive()&&event.touches.length===1)touchStartY=event.touches[0].clientY},{passive:true});
+ ui.addEventListener('touchend',event=>{
+  if(touchStartY===null)return;
+  const distance=event.changedTouches[0].clientY-touchStartY;touchStartY=null;
+  if(Math.abs(distance)>45)moveTravelCard(distance<0?1:-1);
+ },{passive:true});
+ document.addEventListener('keydown',onTravelKey);
  el('signal-sound').onclick=()=>{if(!audioContext){audioOn();audioContext?.resume()}else audioMaster.gain.value=audioMaster.gain.value>0?0:.24;syncAudioLabel()};
  document.getElementById('replay-cinematic-btn')?.addEventListener('click',()=>startIntroCinematic());
  document.addEventListener('visibilitychange',()=>{if(!audioContext)return;if(document.hidden)audioContext.suspend();else if(active)audioContext.resume()});

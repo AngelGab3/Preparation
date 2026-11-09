@@ -36,3 +36,24 @@ body.intro-playing > :not(#intro-cinematic):not(script):not(style){visibility:hi
 .signal-visor-cross{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);font:28px Consolas,monospace;color:#fff0d284}
 .signal-visor span{position:absolute;right:4%;bottom:4%;font:10px Consolas,monospace;letter-spacing:.2em;color:#ffe0b4}
 @media(max-width:760px){.signal-heading{top:18%;max-width:255px}.signal-heading h1{font-size:clamp(32px,7vw,43px)}.signal-intro[data-phase="solar"] .signal-heading,.signal-intro[data-phase="mars"] .signal-heading{top:17%}.signal-intro.is-ready .signal-heading{top:16%;max-width:255px}.signal-intro.is-ready .signal-heading h1{font-size:32px}.signal-side{display:none}}
+
+/* Tarjetas del trayecto: el vuelo permanece visible mientras el lector decide cuándo avanzar. */
+.signal-intro[data-phase="solar"] .signal-heading{opacity:0;transition:opacity .45s ease}
+.signal-intro[data-phase="solar"].is-approaching .signal-heading{opacity:1}
+.signal-travel{position:absolute;z-index:3;left:5%;top:17%;width:min(390px,32vw);box-sizing:border-box;padding:25px 27px 22px;background:linear-gradient(145deg,#151b2de8,#101221d9);border:1px solid #a5d4eb73;border-left:3px solid #f5aa79;box-shadow:0 20px 60px #020611a6,inset 0 1px #ffffff22;backdrop-filter:blur(12px);transition:opacity .45s ease,transform .45s ease}
+.signal-intro.is-approaching .signal-travel{opacity:0;transform:translateY(-16px);pointer-events:none}
+.signal-travel.is-changing .signal-travel-content{animation:signal-card-enter .38s ease both}
+@keyframes signal-card-enter{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+.signal-travel-meta{display:flex;justify-content:space-between;gap:12px;padding-bottom:17px;border-bottom:1px solid #9bd4ec45;font:10px Consolas,monospace;letter-spacing:.19em;color:#a4ddf4}
+.signal-travel-meta span:last-child{color:#ffbc91}
+.signal-travel-content{min-height:192px;padding:26px 0 8px}
+.signal-travel-label{font:11px Consolas,monospace;letter-spacing:.2em;color:#f8ae82}
+.signal-travel h2{font-size:clamp(30px,3vw,44px);line-height:1.02;letter-spacing:-.04em;margin:13px 0 15px;color:#fff0dc}
+.signal-travel-content p{font-size:14px;line-height:1.6;margin:0;color:#d5dee8}
+.signal-travel-progress{display:grid;grid-template-columns:repeat(10,1fr);gap:5px}
+.signal-travel-progress span{height:4px;background:#7e9aaf5e;transition:background .25s,box-shadow .25s}
+.signal-travel-progress span.is-past{background:#a2d7e3}
+.signal-travel-progress span.is-current{background:#ffb37f;box-shadow:0 0 12px #ffb37f}
+.signal-travel-instruction{font:10px/1.5 Consolas,monospace;letter-spacing:.13em;color:#f5c49f;margin:17px 0 0}
+@media(max-width:760px){.signal-travel{left:20px;right:20px;top:13%;width:auto;max-width:340px;padding:18px 20px 17px}.signal-travel-content{min-height:135px;padding:18px 0 8px}.signal-travel h2{font-size:29px;margin:10px 0}.signal-travel-content p{font-size:12px}.signal-travel-instruction{font-size:9px;margin-top:12px}.signal-travel-meta{padding-bottom:12px}}
+@media(prefers-reduced-motion:reduce){.signal-travel,.signal-intro[data-phase="solar"] .signal-heading{transition:none}.signal-travel.is-changing .signal-travel-content{animation:none}}
