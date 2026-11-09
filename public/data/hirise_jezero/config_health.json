@@ -1,10 +1,9 @@
 {
   "dataset_id": "hirise_jezero",
-  "note": "Overrides de Jezero sobre los defaults de src/health_defaults.js. Campos omitidos usan defaults.",
+  "note": "Overrides de Jezero sobre los defaults de src/health_defaults.js. Campos omitidos usan defaults. El traje (masa, O₂, presión) sale de src/suits.js vía suit_id; dosis = RAD/Curiosity 0.67 mSv/día.",
   "body_mass_kg": 82,
-  "suit_mass_kg": 62,
   "terrain_factor": 1.2,
-  "surface_dose_rate_usv_h": 0.21,
+  "surface_dose_rate_usv_h": 27.9,
   "group_size": 3,
   "walk_speed_ms": 1.2,
   "members": [
@@ -14,7 +13,8 @@
       "body_mass_kg": 82,
       "age_years": 45,
       "sex": "male",
-      "fitness_level": "fit"
+      "fitness_level": "fit",
+      "name": "Diego Neri"
     },
     {
       "id": "plt",
@@ -22,16 +22,19 @@
       "body_mass_kg": 70,
       "age_years": 38,
       "sex": "female",
-      "fitness_level": "nominal",
-      "cumulative_career_dose_mgy": 120
+      "fitness_level": "fit",
+      "cumulative_career_dose_msv": 384,
+      "name": "Valentina Ochoa"
     },
     {
       "id": "ms1",
-      "role": "mission_spec",
+      "role": "geologist",
       "body_mass_kg": 90,
       "age_years": 42,
       "sex": "male",
-      "fitness_level": "nominal"
+      "fitness_level": "fit",
+      "name": "Mateo Ríos"
     }
-  ]
+  ],
+  "suit_id": "xemu"
 }

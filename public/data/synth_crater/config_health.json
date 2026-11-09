@@ -1,8 +1,8 @@
 {
-    "dataset_id": "synth_crater",
-        "note": "Dataset sintético de validación: astronauta solo con defaults.",
-            "body_mass_kg": 80,
-                "suit_mass_kg": 60,
-                    "terrain_factor": 1.1,
-                        "group_size": 1
+  "dataset_id": "synth_crater",
+  "note": "Dataset sintético de validación: astronauta solo con defaults. El traje (masa, O₂, presión) sale de src/suits.js vía suit_id; dosis = RAD/Curiosity 0.67 mSv/día.",
+  "body_mass_kg": 80,
+  "terrain_factor": 1.1,
+  "group_size": 1,
+  "suit_id": "xemu"
 }

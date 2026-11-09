@@ -72,7 +72,7 @@ test('stationary segment at steep slope does not trigger metabolic flag', () => 
     assert.ok(next.metabolic_rate_w < 400);
 });
 
-test('advanceMemberState: not_modeled dimensions are null in G2', () => {
+test('advanceMemberState: G3 modela dosis GCR; incapacitación sigue sin modelo', () => {
     const initial = initMemberState(MEMBER, CFG);
     const next = advanceMemberState(
         { walking_time_h: 0.1, slope_deg: 0, delta_elev_m: 0, surface_distance_m: 100, walk_speed_ms: 1.2 },
@@ -83,8 +83,8 @@ test('advanceMemberState: not_modeled dimensions are null in G2', () => {
     assert.ok(next.t_core_c >= 37.0 && next.t_core_c <= 37.5);
     assert.ok(typeof next.hydration_deficit_l === 'number');
     assert.ok(next.hydration_deficit_l >= 0);
-    /* Siguen sin modelarse en G2 */
-    assert.equal(next.dose_usv, null);
+    /* G3.2: dosis = tasa RAD (27.9 µSv/h) × 0.1 h */
+    assert.ok(Math.abs(next.dose_usv - 2.79) < 1e-9);
     assert.equal(next.time_to_incapacitation_min, null);
 });
 

@@ -1,7 +1,7 @@
 /* Constantes globales (1 unidad de Three.js = 1 metro). Sin imports de otros módulos propios. */
 
 export const CONFIG = {
-  DEFAULT_DATASET: 'jezero_test',
+  DEFAULT_DATASET: 'hirise_jezero',
 
   SEGMENTS: 256,
 

@@ -37,7 +37,7 @@
       <div class="helmet-shell-glass"></div>
       <span class="helmet-shell-latch helmet-shell-latch-left"></span>
       <span class="helmet-shell-latch helmet-shell-latch-right"></span>
-      <span class="helmet-shell-label">EVA // VISOR PRESURIZADO · WASD MOVER · E ANALIZAR · V VISTA · ESC SALIR</span>
+      <span class="helmet-shell-label">EVA // VISOR PRESURIZADO · WASD MOVER · E ANALIZAR · V VISTA · G GRUPO · ESC SALIR</span>
     </div>
     <div class="hud-top-left">
       <div class="hud-tag">// EVA_STATUS · PLSS</div>
@@ -160,7 +160,7 @@
       <!-- Fase G1: estado de salud del grupo / solo -->
       <div id="group-status-panel" class="group-status-panel" hidden>
         <div class="group-status-header">
-          <span class="group-status-title">// GROUP_STATUS</span>
+          <span class="group-status-title">// GROUP_STATUS <kbd class="group-status-key" title="Tecla G: mostrar u ocultar el detalle">G</kbd></span>
           <span id="group-status-meta" class="group-status-meta">solo · leader: —</span>
           <div id="group-status-extra" class="group-status-extra">MODELO: G2 · RUTA: OXYGEN</div>
         </div>
@@ -215,9 +215,9 @@
     <div class="dataset-bar">
       <label for="dataset-select" class="sr-only">Zona de estudio</label>
       <select id="dataset-select" class="dataset-select" title="Cambiar zona de estudio (dataset)">
-        <option value="jezero_test">Jezero (dataset de prueba)</option>
-        <option value="synth_crater">Cráter Sintético (validación)</option>
         <option value="hirise_jezero">Jezero HiRISE 1 m/px (ventana 2 km)</option>
+        <option value="jezero_test">Jezero CTX 20 m/px (cráter completo)</option>
+        <option value="synth_crater">Cráter Sintético (validación)</option>
       </select>
     </div>
     <div class="realtime-dem-row">
@@ -362,6 +362,34 @@
         <canvas id="route-profile-canvas" width="246" height="86"></canvas>
       </div>
       <button id="route-export-btn" class="route-btn export" type="button">⬇ Exportar route.json</button>
+
+      <!-- === Tripulación: Solo / Grupo + editor de astronautas === -->
+      <details id="crew-panel" class="health-route-compare crew-panel">
+        <summary class="health-route-summary">
+          <span>👩‍🚀 Tripulación</span>
+          <span id="crew-meta" class="hrc-status">Solo</span>
+        </summary>
+        <div class="hrc-body">
+          <div class="algo-switch-row" role="group" aria-label="Modo de tripulación">
+            <button id="crew-mode-solo" class="algo-pill active" type="button">Solo</button>
+            <button id="crew-mode-group" class="algo-pill" type="button">Grupo</button>
+          </div>
+          <div id="crew-group-tools" class="crew-tools" hidden>
+            <label for="crew-size" class="sr-only">Tamaño de la tripulación</label>
+            <select id="crew-size" class="dataset-select crew-size" title="Tamaño de la tripulación"></select>
+            <button id="crew-generate-btn" class="route-btn" type="button"
+              title="Genera una tripulación nueva al azar (reinicia consumos)">🎲 Generar</button>
+            <button id="crew-add-btn" class="route-btn secondary" type="button" title="Añadir un astronauta">＋</button>
+          </div>
+          <div id="crew-summary" class="crew-summary"></div>
+          <div id="crew-list" class="crew-list"></div>
+        </div>
+      </details>
+
+      <button id="suit-lab-btn" class="route-btn suit-lab-btn" type="button"
+        title="Traje en 3D, tanques y presiones, Marte vs Tierra y fórmulas del modelo">
+        🧑‍🚀 Traje EVA y soporte vital
+      </button>
 
       <!-- === Comparador clásico vs salud === -->
       <details id="health-route-compare" class="health-route-compare">
@@ -566,6 +594,8 @@
     });
   </script>
   <script type="module" src="/src/main.js"></script>
+  <!-- Sección "Traje EVA": su contenido y su código se cargan al abrirla -->
+  <section id="suit-lab" hidden></section>
 </body>
 
 </html>

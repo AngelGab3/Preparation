@@ -3,7 +3,7 @@
  *
  * Comparación apples-to-apples: usa el mismo A* para ambas rutas; solo cambian las dimensiones. */
 
-import { advanceGroupState, aggregateGroupState } from './health_group.js';
+import { advanceGroupState, aggregateGroupState, routeWalkSpeed } from './health_group.js';
 
 export const DIMENSION_KEYS = ['slope', 'metabolic', 'heart_rate', 'oxygen', 'thermal', 'hydration', 'radiation'];
 
@@ -14,7 +14,7 @@ export const DIMENSION_LABELS = {
     oxygen: 'Consumo O₂',
     thermal: 'Térmico (T_core)',
     hydration: 'Hidratación',
-    radiation: 'Radiación (Fase G3)',
+    radiation: 'Radiación (GCR, RAD)',
 };
 
 export const PRESETS = {
@@ -66,6 +66,17 @@ class MinHeap {
     }
 }
 
+/* Esfuerzo relativo: cuadrático hasta el límite sostenible; por encima, penalización fuerte
+ * (ese tramo no se puede sostener ni bajando al ritmo mínimo). */
+export function metabolicPenalty(frac) {
+    return frac <= 1 ? frac * frac : 1 + 10 * (frac - 1);
+}
+
+const STATUS_SEVERITY = { nominal: 0, low_o2: 1, elevated: 2, at_risk_over_sustainable: 3, critical: 4 };
+export function worseStatus(a, b) {
+    return (STATUS_SEVERITY[b] ?? 0) > (STATUS_SEVERITY[a] ?? 0) ? b : a;
+}
+
 /* Factor de salud para UNA arista. Cache por grado con signo (181 entradas). */
 function buildEdgeHealthFactor(dimensions, group, ambientC) {
     const cache = new Map();
@@ -78,10 +89,11 @@ function buildEdgeHealthFactor(dimensions, group, ambientC) {
         const key = Math.round(slope_deg) * sign;
         if (cache.has(key)) return cache.get(key);
 
+        const v = routeWalkSpeed(group, slope_deg * sign);
         const seg = {
-            walking_time_h: dist_m / group.cfg.walk_speed_ms / 3600,
+            walking_time_h: dist_m / v / 3600,
             slope_deg, delta_elev_m: deltaElev_m, surface_distance_m: dist_m,
-            walk_speed_ms: group.cfg.walk_speed_ms,
+            walk_speed_ms: v,
             ambient_temp_c: ambientC,
         };
         const sim = advanceGroupState(simGroup, seg);
@@ -91,12 +103,15 @@ function buildEdgeHealthFactor(dimensions, group, ambientC) {
             slope: slope_deg > maxSafe
                 ? 5.0 + (slope_deg - maxSafe) * 0.5
                 : 1 + (slope_deg / maxSafe) ** 2,
-            metabolic: (agg.max_metabolic_w / group.cfg.max_sustainable_m_w) ** 2,
-            heart_rate: (agg.max_hr_bpm / group.cfg.hr_max_bpm) ** 2,
-            oxygen: agg.max_metabolic_w / 600,
+            /* Fracciones por miembro: manda el miembro más limitado, no un máximo genérico */
+            metabolic: metabolicPenalty(agg.max_metabolic_fraction ?? agg.max_metabolic_w / group.cfg.max_sustainable_m_w),
+            heart_rate: (agg.max_hr_fraction ?? agg.max_hr_bpm / group.cfg.hr_max_bpm) ** 2,
+            /* O₂ por METRO (no por minuto): ir más lento cuesta más tiempo respirando. Ref: 600 W a 1.2 m/s */
+            oxygen: (agg.max_metabolic_w / v) / (600 / 1.2),
             thermal: Math.max(0, (agg.max_t_core_c - 37) / 1.5),
             hydration: agg.max_dehydration_pct / (group.cfg.dehydration_warning_pct_body_mass || 2.0),
-            radiation: 0,
+            /* GCR de fondo: dosis ∝ tiempo de exposición → coste por metro relativo a la tasa de Gale */
+            radiation: ((group.cfg.surface_dose_rate_usv_h ?? 27.9) / 27.9) * (1.2 / v),
         };
 
         let num = 0;
@@ -276,7 +291,8 @@ function finalizeRoute(path_m, sampleElevation, sampleSlope, group, dimensions, 
 /* Simulación acumulada de una ruta: camina los edges en secuencia y acumula estado fisiológico. */
 export function simulateRouteMetrics(path_m, sampleElevation, sampleSlope, group, ambientC = -63) {
     let sim = { ...group, cfg: { ...group.cfg, health_smoothing_alpha: 1.0 } };
-    let totalDist = 0, maxSlope = 0;
+    let totalDist = 0, maxSlope = 0, totalTimeH = 0, minPace = Infinity;
+    let worst = 'nominal', overloadH = 0;
     let peakM = 0, peakHR = 0, peakTCore = 37, peakHyd = 0;
     let sumM = 0, sumHR = 0, n = 0;
 
@@ -289,14 +305,19 @@ export function simulateRouteMetrics(path_m, sampleElevation, sampleSlope, group
         const e1 = sampleElevation(x1, z1);
         const slope = sampleSlope((x0 + x1) / 2, (z0 + z1) / 2);
 
+        const v = routeWalkSpeed(group, (e1 - e0) >= 0 ? slope : -slope);
         const seg = {
-            walking_time_h: dist / group.cfg.walk_speed_ms / 3600,
+            walking_time_h: dist / v / 3600,
             slope_deg: slope, delta_elev_m: e1 - e0, surface_distance_m: dist,
-            walk_speed_ms: group.cfg.walk_speed_ms, ambient_temp_c: ambientC,
+            walk_speed_ms: v, ambient_temp_c: ambientC,
         };
         sim = advanceGroupState(sim, seg);
         const agg = aggregateGroupState(sim);
         totalDist += dist;
+        totalTimeH += seg.walking_time_h;
+        minPace = Math.min(minPace, v);
+        worst = worseStatus(worst, agg.status);
+        if (agg.max_metabolic_fraction > 1) overloadH += seg.walking_time_h;
         maxSlope = Math.max(maxSlope, slope);
         peakM = Math.max(peakM, agg.max_metabolic_w);
         peakHR = Math.max(peakHR, agg.max_hr_bpm);
@@ -310,6 +331,9 @@ export function simulateRouteMetrics(path_m, sampleElevation, sampleSlope, group
     const finalAgg = aggregateGroupState(sim);
     return {
         total_distance_m: totalDist,
+        total_time_h: totalTimeH,
+        mean_pace_ms: totalTimeH > 0 ? totalDist / (totalTimeH * 3600) : 0,
+        min_pace_ms: Number.isFinite(minPace) ? minPace : 0,
         max_slope_deg: maxSlope,
         peak_metabolic_w: peakM,
         mean_metabolic_w: n ? sumM / n : 0,
@@ -319,8 +343,11 @@ export function simulateRouteMetrics(path_m, sampleElevation, sampleSlope, group
         peak_dehydration_pct: peakHyd,
         o2_used_l: finalAgg.sum_o2_consumed_l,
         o2_remaining_min_l: finalAgg.min_o2_remaining_l,
+        dose_usv: finalAgg.max_dose_usv,
         energy_kj: finalAgg.sum_energy_kj,
-        status: finalAgg.status,
+        overload_time_min: overloadH * 60,
+        status: worseStatus(worst, finalAgg.status),   // peor estado de TODO el recorrido
+        final_status: finalAgg.status,
         final_group: finalAgg,
     };
 }
@@ -334,6 +361,8 @@ export function compareRoutes(classicPath, healthPath, sampleElevation, sampleSl
     const deltas = {
         distance_m: health.total_distance_m - classic.total_distance_m,
         distance_pct: pct(health.total_distance_m, classic.total_distance_m),
+        time_h: health.total_time_h - classic.total_time_h,
+        time_pct: pct(health.total_time_h, classic.total_time_h),
         max_slope_deg: health.max_slope_deg - classic.max_slope_deg,
         peak_metabolic_w: health.peak_metabolic_w - classic.peak_metabolic_w,
         peak_metabolic_pct: pct(health.peak_metabolic_w, classic.peak_metabolic_w),
@@ -343,6 +372,7 @@ export function compareRoutes(classicPath, healthPath, sampleElevation, sampleSl
         o2_used_pct: pct(health.o2_used_l, classic.o2_used_l),
         peak_t_core_c: health.peak_t_core_c - classic.peak_t_core_c,
         peak_dehydration_pct: health.peak_dehydration_pct - classic.peak_dehydration_pct,
+        overload_time_min: health.overload_time_min - classic.overload_time_min,
         status_changed: health.status !== classic.status,
     };
     return { classic, health, deltas };

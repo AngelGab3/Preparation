@@ -14,8 +14,9 @@ import { spawnAstronaut, updateAstronautThirdPersonVisuals, restoreAstronautOrbi
 import { hideInfoPopup, syncPopupHeight } from './popup.js';
 import { queryAresCopilot, showTransmissionOnHUD, speakCopilotRadio, triggerRoverFunFact, toggleCopilotVoice, tickRoverCompanionFacts } from './copilot.js';
 /* === G1 === */
-import { advanceGroupState, aggregateGroupState, createSoloHealth } from './health_group.js';
+import { advanceGroupState, aggregateGroupState, createSoloHealth, groupSustainablePace } from './health_group.js';
 import { computeHealthAwareRoute, compareRoutes, PRESETS } from './health_route_astar.js';
+import { ROLES } from './crew.js';
 const modeBtn = document.getElementById('mode-btn');
 const viewToggleBtn = document.getElementById('view-toggle-btn');
 const hintEl = document.querySelector('.hint');
@@ -185,6 +186,10 @@ export function initControls() {
       if (e.code === 'KeyU' && !e.repeat) {
         e.preventDefault();
         toggleCopilotVoice();
+      }
+      if (e.code === 'KeyG' && !e.repeat) {
+        e.preventDefault();
+        toggleGroupPanel();
       }
       /* === G2 === */
       if (e.code === 'KeyM' && !e.repeat) {
@@ -650,6 +655,19 @@ function renderHUD() {
 }
 
 /* === G1 + G2: render del panel GROUP_STATUS con throttle a 5 Hz === */
+const GROUP_STATUS_LABEL = {
+  nominal: 'NOMINAL', low_o2: 'O₂ BAJO', elevated: 'ESFUERZO ALTO',
+  at_risk_over_sustainable: 'SOBRE EL LÍMITE', critical: 'CRÍTICO',
+};
+let groupPanelCollapsed = false;
+try { groupPanelCollapsed = localStorage.getItem('marswalk_group_panel') === 'collapsed'; } catch { /* sin almacenamiento */ }
+
+function toggleGroupPanel() {
+  groupPanelCollapsed = !groupPanelCollapsed;
+  try { localStorage.setItem('marswalk_group_panel', groupPanelCollapsed ? 'collapsed' : 'open'); } catch { /* sin almacenamiento */ }
+  renderGroupHUD._lastMs = 0;
+}
+
 function renderGroupHUD() {
   const nowMs = performance.now();
   if (nowMs - (renderGroupHUD._lastMs || 0) < 200) return;
@@ -667,10 +685,38 @@ function renderGroupHUD() {
   }
   panel.hidden = false;
 
+  /* Se ancla justo debajo del bloque de controles (cambia de sitio entre 1ª y 3ª persona)
+   * y nunca baja hasta los instrumentos de la esquina inferior derecha. */
+  const ctrlRect = document.querySelector('.controls')?.getBoundingClientRect();
+  const bottomRect = document.querySelector('.hud-bottom-right')?.getBoundingClientRect();
+  if (ctrlRect && ctrlRect.width > 0) {
+    const top = Math.round(ctrlRect.bottom + 8);
+    panel.style.top = `${top}px`;
+    panel.style.right = `${Math.round(window.innerWidth - ctrlRect.right)}px`;
+    const limit = bottomRect && bottomRect.top > top ? bottomRect.top : window.innerHeight;
+    panel.style.maxHeight = `${Math.max(40, Math.round(limit - top - 12))}px`;
+  }
+  panel.classList.toggle('collapsed', groupPanelCollapsed);
+
   const agg = state.healthLastAggregate;
   const leaderIdx = agg.leaderIndex;
   const modeLabel = agg.mode === 'solo' ? 'SOLO' : `GROUP · ${agg.members.length} · ROT ${agg.totalRotations}`;
-  metaEl.textContent = `${modeLabel} · leader: ${agg.leaderId ?? '—'}`;
+  const nameOf = (id) => { const mm = agg.members.find((x) => x.id === id); return mm?.name || id || '—'; };
+  /* Ritmo que el miembro más limitado sostiene en la pendiente actual (el grupo no deja a nadie atrás) */
+  const slopeNow = state.astronautPosition ? (sampleSlopeDeg(state.astronautPosition.x, state.astronautPosition.z) ?? 0) : 0;
+  const pace = groupSustainablePace(state.health, slopeNow);
+  const paceTxt = pace.binding_member_id
+    ? `ritmo ≤ ${pace.pace_ms.toFixed(2)} m/s (limita ${nameOf(pace.binding_member_id)})`
+    : `ritmo ${pace.pace_ms.toFixed(2)} m/s`;
+  if (groupPanelCollapsed) {
+    const o2Pct = Math.min(...agg.members.map((m) => (m.o2_capacity_l_equiv ? m.o2_remaining_l / m.o2_capacity_l_equiv : 1))) * 100;
+    metaEl.textContent = `${agg.mode === 'solo' ? 'SOLO' : `GRUPO · ${agg.members.length}`} · ${GROUP_STATUS_LABEL[agg.status] || agg.status} · O₂ mín ${o2Pct.toFixed(0)}%`;
+    metaEl.className = `group-status-meta status-${agg.status}`;
+    listEl.innerHTML = '';
+    return;
+  }
+  metaEl.className = 'group-status-meta';
+  metaEl.textContent = agg.mode === 'solo' ? `${modeLabel} · ${paceTxt}` : `${modeLabel} · abre: ${nameOf(agg.leaderId)} · ${paceTxt}`;
 
   listEl.innerHTML = agg.members.map((m, idx) => {
     const isLeader = idx === leaderIdx;
@@ -678,13 +724,16 @@ function renderGroupHUD() {
       m.flags.o2_depleted || m.flags.over_sustainable_metabolic || m.flags.thermal_critical || m.flags.dehydration_critical ? 'critical'
         : m.flags.hr_above_85pct_max || m.flags.o2_low || m.flags.thermal_warning || m.flags.dehydration_warning ? 'warn'
           : 'nominal';
-    const roleTag = m.role === 'leader' ? 'L' : m.role === 'follower' ? 'F' : '·';
+    const roleTag = m.nav_role === 'leader' ? 'L' : m.nav_role === 'follower' ? 'F' : '·';
     const tCore = typeof m.t_core_c === 'number' ? `${m.t_core_c.toFixed(1)}°C` : '—';
     const hyd = typeof m.dehydration_pct_body_mass === 'number' ? `${m.dehydration_pct_body_mass.toFixed(1)}%` : '—';
+    const effort = typeof m.metabolic_fraction_of_max === 'number' ? `${(m.metabolic_fraction_of_max * 100).toFixed(0)}%` : '—';
+    const autonomy = Number.isFinite(m.o2_time_remaining_min) ? `${(m.o2_time_remaining_min / 60).toFixed(1)}h` : '—';
+    const dose = typeof m.dose_usv === 'number' ? `${m.dose_usv.toFixed(1)}µSv` : '—';
     return `<div class="group-member ${statusClass} ${isLeader ? 'leader' : ''}">
       <span class="member-role">${roleTag}</span>
-      <span class="member-id">${m.id}</span>
-      <span class="member-metric">O₂ ${m.o2_remaining_l.toFixed(0)}L · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W · ${tCore} · ${hyd}</span>
+      <span class="member-id">${m.name || m.id}${ROLES[m.role] ? ` <small>${ROLES[m.role].short}</small>` : ''}</span>
+      <span class="member-metric" title="O₂ restante · autonomía · FC · metabolismo (esfuerzo vs sostenible) · T núcleo · deshidratación · dosis GCR">O₂ ${m.o2_remaining_l.toFixed(0)}L (${autonomy}) · ${m.heart_rate_bpm.toFixed(0)}bpm · ${m.metabolic_rate_w.toFixed(0)}W ${effort} · ${tCore} · ${hyd} · ${dose}</span>
     </div>`;
   }).join('');
 
@@ -692,7 +741,7 @@ function renderGroupHUD() {
     const routeMode = (state.routeCostMode || 'oxygen').toUpperCase();
     const tCore = typeof agg.max_t_core_c === 'number' ? `${agg.max_t_core_c.toFixed(1)}` : '—';
     const hyd = typeof agg.max_dehydration_pct === 'number' ? `${agg.max_dehydration_pct.toFixed(1)}` : '—';
-    extraEl.textContent = `MODELO: G2 · RUTA: ${routeMode} · TÉRMICA: ${tCore}°C · DESHID: ${hyd}%`;
+    extraEl.textContent = `MODELO: G3 · TRAJE: ${(state.health?.cfg?.suit_id || 'xemu').toUpperCase()} · RUTA: ${routeMode} · TÉRMICA: ${tCore}°C · DESHID: ${hyd}%`;
   }
 }
 /* === /G1+G2 === */
@@ -942,7 +991,7 @@ function updateUI() {
       : '🎥 Vista: 1ª Persona [V]';
   }
   hintEl.textContent = isFP
-    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
+    ? 'WASD = Moverse · Shift = Correr · Space = Saltar · V = 1ª/3ª Persona · G = Panel de grupo · R = Dato Robert · U = Audio ON/OFF · E = Analizar · C = Radio · ESC = Salir'
     : 'Arrastra = Mover mapa · Rueda = Zoom · Clic = Info · Arrastra el astronauta al mapa';
   document.body.classList.toggle('fp', isFP);
   document.body.classList.toggle('helmet-view', isFP && !state.fpThirdPerson);
@@ -1153,13 +1202,17 @@ function renderComparisonTable(comp) {
 
   const rows = [
     { label: 'Distancia (m)', classic: classic.total_distance_m.toFixed(0), health: health.total_distance_m.toFixed(0), delta: fmtAbs(deltas.distance_m) + ' (' + fmtPct(deltas.distance_pct) + ')', cls: classFor(deltas.distance_m) },
+    { label: 'Tiempo (min)', classic: (classic.total_time_h * 60).toFixed(0), health: (health.total_time_h * 60).toFixed(0), delta: fmtAbs(deltas.time_h * 60) + ' (' + fmtPct(deltas.time_pct) + ')', cls: classFor(deltas.time_h) },
+    { label: 'Ritmo medio (m/s)', classic: classic.mean_pace_ms.toFixed(2), health: health.mean_pace_ms.toFixed(2), delta: fmtAbs(health.mean_pace_ms - classic.mean_pace_ms, 2), cls: 'delta-neutral' },
     { label: 'Pendiente máx (°)', classic: classic.max_slope_deg.toFixed(1), health: health.max_slope_deg.toFixed(1), delta: fmtAbs(deltas.max_slope_deg, 1) + '°', cls: classFor(deltas.max_slope_deg) },
     { label: 'Peak M (W)', classic: classic.peak_metabolic_w.toFixed(0), health: health.peak_metabolic_w.toFixed(0), delta: fmtAbs(deltas.peak_metabolic_w) + ' (' + fmtPct(deltas.peak_metabolic_pct) + ')', cls: classFor(deltas.peak_metabolic_w) },
     { label: 'Peak FC (bpm)', classic: classic.peak_hr_bpm.toFixed(0), health: health.peak_hr_bpm.toFixed(0), delta: fmtAbs(deltas.peak_hr_bpm) + ' (' + fmtPct(deltas.peak_hr_pct) + ')', cls: classFor(deltas.peak_hr_bpm) },
     { label: 'O₂ usado (L)', classic: classic.o2_used_l.toFixed(1), health: health.o2_used_l.toFixed(1), delta: fmtAbs(deltas.o2_used_l, 1) + ' (' + fmtPct(deltas.o2_used_pct) + ')', cls: classFor(deltas.o2_used_l) },
     { label: 'Peak T_core (°C)', classic: classic.peak_t_core_c.toFixed(2), health: health.peak_t_core_c.toFixed(2), delta: fmtAbs(deltas.peak_t_core_c, 2) + '°C', cls: classFor(deltas.peak_t_core_c) },
+    { label: 'Sobre el límite (min)', classic: classic.overload_time_min.toFixed(1), health: health.overload_time_min.toFixed(1), delta: fmtAbs(deltas.overload_time_min, 1), cls: classFor(deltas.overload_time_min) },
+    { label: 'Dosis GCR (µSv)', classic: classic.dose_usv.toFixed(1), health: health.dose_usv.toFixed(1), delta: fmtAbs(health.dose_usv - classic.dose_usv, 1), cls: classFor(health.dose_usv - classic.dose_usv) },
     { label: 'Deshidrat. máx (%)', classic: classic.peak_dehydration_pct.toFixed(2), health: health.peak_dehydration_pct.toFixed(2), delta: fmtAbs(deltas.peak_dehydration_pct, 2) + '%', cls: classFor(deltas.peak_dehydration_pct) },
-    { label: 'Estado final', classic: classic.status, health: health.status, delta: deltas.status_changed ? 'cambió' : 'igual', cls: health.status === 'nominal' ? 'delta-good' : (health.status === 'critical' ? 'delta-bad' : 'delta-neutral') },
+    { label: 'Peor estado', classic: classic.status, health: health.status, delta: deltas.status_changed ? 'cambió' : 'igual', cls: health.status === 'nominal' ? 'delta-good' : (health.status === 'critical' ? 'delta-bad' : 'delta-neutral') },
   ];
 
   tbody.innerHTML = rows.map((r) => `

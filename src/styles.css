@@ -2773,6 +2773,227 @@ body.helmet-view .hud-radio-toast.visible {
   body.helmet-view .hud-interact-prompt { animation: none; }
 }
 
+
+/* Panel de grupo del HUD: anclado por JS bajo los controles, plegable con la tecla G */
+.group-status-panel {
+  overflow: hidden;
+}
+
+.group-status-key {
+  font: inherit;
+  font-size: 9px;
+  padding: 0 4px;
+  margin-left: 4px;
+  border: 1px solid rgba(102, 252, 241, 0.5);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+.group-status-panel.collapsed .group-status-header {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.group-status-panel.collapsed .group-status-extra,
+.group-status-panel.collapsed .group-members-list {
+  display: none;
+}
+
+.group-status-meta.status-nominal { color: var(--hud-green); }
+.group-status-meta.status-critical,
+.group-status-meta.status-at_risk_over_sustainable { color: var(--hud-red); }
+
+/* Texto de controles en superficie: pequeño y pegado al borde inferior */
+body.fp .hint {
+  bottom: 4px;
+  padding: 2px 10px;
+  font-size: 8px;
+  letter-spacing: 0.04em;
+  opacity: 0.8;
+  background: transparent;
+  border-color: transparent;
+  text-shadow: 0 0 3px #000, 0 0 3px #000;
+}
+
+.suit-lab-btn {
+  width: 100%;
+  margin-top: 8px;
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* ------------------------------------------------------------------ Tripulación (F2) */
+/* HUD de grupo: cabecera y filas en dos líneas para que quepan nombres y métricas */
+.group-status-panel {
+  width: 300px;
+}
+
+.group-status-header {
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.group-status-header .group-status-meta,
+.group-status-header .group-status-extra {
+  flex: 1 1 100%;
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.group-member {
+  grid-template-columns: 14px 1fr;
+  gap: 1px 6px;
+}
+
+.group-member .member-id {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.group-member .member-id small {
+  font-weight: 400;
+  opacity: 0.7;
+}
+
+.group-member .member-metric {
+  grid-column: 2;
+}
+
+.crew-tools {
+  display: flex;
+  gap: 4px;
+  margin-top: 6px;
+  align-items: stretch;
+}
+
+.crew-tools[hidden] {
+  display: none;
+}
+
+.crew-tools .crew-size {
+  flex: 0 0 52px;
+  width: 52px;
+}
+
+.crew-tools .route-btn {
+  margin: 0;
+  flex: 1;
+}
+
+.crew-tools #crew-add-btn {
+  flex: 0 0 34px;
+}
+
+.crew-summary {
+  margin: 8px 0 6px;
+  font-size: 10px;
+  line-height: 1.5;
+  color: #a0c4c2;
+}
+
+.crew-summary b {
+  color: #f6c945;
+  font-weight: 700;
+}
+
+.crew-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 300px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.crew-card {
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--role-color, #66fcf1);
+  border-radius: 6px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.crew-card-head {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  margin-bottom: 5px;
+}
+
+.crew-badge {
+  flex: none;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  border-radius: 4px;
+  color: #0b0d10;
+  background: var(--role-color, #66fcf1);
+}
+
+.crew-input {
+  width: 100%;
+  min-width: 0;
+  font-family: inherit;
+  font-size: 10px;
+  color: var(--text);
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 3px 4px;
+}
+
+.crew-input:focus {
+  outline: none;
+  border-color: var(--hud-cyan);
+}
+
+.crew-name {
+  font-weight: 700;
+}
+
+.crew-del {
+  flex: none;
+  font-family: inherit;
+  font-size: 10px;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.crew-del:hover {
+  color: var(--hud-red);
+  border-color: var(--hud-red);
+}
+
+.crew-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px 6px;
+}
+
+.crew-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 9px;
+  color: var(--muted);
+  min-width: 0;
+}
+
+.crew-stats {
+  margin-top: 5px;
+  font-size: 9px;
+  line-height: 1.4;
+  color: #a0c4c2;
+}
+
 /* ------------------------------------------- Móvil: paneles como hoja inferior (solo ≤760 px) */
 .mobile-tabs {
   display: none;
