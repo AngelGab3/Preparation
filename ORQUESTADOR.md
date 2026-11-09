@@ -299,6 +299,8 @@ python -m http.server 8000
 
 | 2026-11-07 | Codex | Publicadas en la rama existente `Nasa_Saul` las mejoras locales de introducción, Robert, estación y terreno mediante PR #4 hacia `main`. Supuesto: el PR #3 ya fusionado corresponde a la entrega anterior; se conservó la misma rama y se excluyeron los 13 archivos preparados por separado. Medición: PR #4 abierto y fusionable, siete archivos de producto en el primer commit; `npm run check` y 37 pruebas correctos. | Revisión y fusión del PR #4 por el usuario; los 13 archivos preparados por separado permanecen fuera del PR. |
 
+| 2026-11-09 | Codex | Publicados en `origin/Nasa_Saul` los 13 archivos de diseño, imágenes, video y prototipos que ya estaban preparados en el índice local; no se modificó `main` ni se abrió un PR. Supuesto: la autorización de subir los cambios comprende exactamente esos archivos preparados. Medición: rama local y remota sincronizadas antes del commit, `git diff --cached --check` correcto, sintaxis de los dos scripts validada y video de 11.0 MB. | Revisión de estos materiales y eventual PR al repositorio original por el usuario. |
+
 **Decisiones abiertas (no resolverlas sin consultar al equipo)**
 - ¿Zona de estudio definitiva? (Jezero, Gale u otra, o la que entregue la competencia).
 - ¿Resolución objetivo del DEM y tamaño del parche local?
