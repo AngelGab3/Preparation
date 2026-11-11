@@ -1,10 +1,6 @@
-# Marswalk 3D — Exploración EVA en Marte
+Marswalk 3D — Exploración EVA en Marte
 
 **🚀 Demo en vivo: https://angelgab3.github.io/Preparation/**
-
-Mapa 3D interactivo para que un astronauta planifique y ejecute una caminata (EVA) en el **cráter Jezero**. Combina datos de varias misiones de la NASA en una sola vista por capas, calcula rutas seguras y estima el consumo de oxígeno según el terreno.
-
-Proyecto para el reto *Interplanetary Survival Guide: Martian Map* — NASA Space Apps Challenge 2026.
 
 ![Vista orbital de Jezero con ruta planificada](docs/screenshot.jpg)
 
